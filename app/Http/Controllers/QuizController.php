@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Attempt;
 use App\Models\Quiz;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class QuizController extends Controller
 {
@@ -55,8 +56,10 @@ class QuizController extends Controller
         ]);
     }
 
-    public function leaderboard(int $id): JsonResponse
+    public function leaderboard(Request $request, int $id): JsonResponse
     {
+        $user = $request->user();
+
         $attempts = Attempt::query()
             ->where('quiz_id', $id)
             ->where('is_complete', true)
@@ -64,10 +67,9 @@ class QuizController extends Controller
             ->with('user:id,name')
             ->orderByDesc('score')
             ->orderBy('submitted_at')
-            ->limit(10)
             ->get();
 
-        $leaderboard = $attempts->values()->map(function (Attempt $attempt, int $index) {
+        $rankedRows = $attempts->values()->map(function (Attempt $attempt, int $index) {
             $nameParts = preg_split('/\s+/', trim((string) $attempt->user?->name));
             $first = $nameParts[0] ?? 'Student';
             $lastInitial = '';
@@ -82,6 +84,8 @@ class QuizController extends Controller
 
             return [
                 'rank' => $index + 1,
+                'user_id' => $attempt->user?->id,
+                'name' => (string) ($attempt->user?->name ?? 'Student'),
                 'display_name' => $displayName,
                 'score' => $score,
                 'total_marks' => $totalMarks,
@@ -90,6 +94,12 @@ class QuizController extends Controller
             ];
         });
 
-        return response()->json($leaderboard);
+        $top = $rankedRows->take(10)->values();
+        $me = $rankedRows->firstWhere('user_id', $user?->id);
+
+        return response()->json([
+            'top' => $top,
+            'me' => $me,
+        ]);
     }
 }

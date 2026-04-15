@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Attempt;
 use App\Models\Course;
 use App\Models\Week;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class CourseController extends Controller
 {
@@ -70,8 +72,10 @@ class CourseController extends Controller
         return response()->json($weeks);
     }
 
-    public function weekQuizzes(string $slug, int $weekNumber): JsonResponse
+    public function weekQuizzes(Request $request, string $slug, int $weekNumber): JsonResponse
     {
+        $user = $request->user();
+
         $course = Course::query()
             ->where('slug', $slug)
             ->where('is_active', true)
@@ -95,12 +99,28 @@ class CourseController extends Controller
                 'description',
                 'time_limit_minutes',
             ])
+            ->values();
+
+        $attemptMeta = Attempt::query()
+            ->where('user_id', $user->id)
+            ->whereIn('quiz_id', $quizzes->pluck('id'))
+            ->where('is_complete', true)
+            ->whereNotNull('submitted_at')
+            ->selectRaw('quiz_id, MAX(submitted_at) as last_submitted_at, COUNT(*) as attempt_count')
+            ->groupBy('quiz_id')
+            ->get()
+            ->keyBy('quiz_id');
+
+        $quizzes = $quizzes
             ->map(fn ($quiz) => [
                 'id' => $quiz->id,
                 'title' => $quiz->title,
                 'description' => $quiz->description,
                 'time_limit_minutes' => $quiz->time_limit_minutes,
                 'question_count' => $quiz->questions_count,
+                'user_has_attempted' => $attemptMeta->has($quiz->id),
+                'attempt_count' => (int) ($attemptMeta->get($quiz->id)?->attempt_count ?? 0),
+                'last_submitted_at' => $attemptMeta->get($quiz->id)?->last_submitted_at,
             ])
             ->values();
 
