@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\AdminQuestionController;
 use App\Http\Controllers\Admin\AdminQuizController;
 use App\Http\Controllers\AttemptController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CodePlaygroundController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\IDEController;
 use App\Http\Controllers\QuizController;
@@ -46,6 +47,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/ide-problems/{id}/run', [IDEController::class, 'run'])->middleware('throttle:30,1');
     Route::post('/ide-problems/{id}/submit', [IDEController::class, 'submit'])->middleware('throttle:30,1');
     Route::get('/ide-problems/{id}/my-submissions', [IDEController::class, 'mySubmissions']);
+    Route::post('/code/playground/run', [CodePlaygroundController::class, 'run'])->middleware('throttle:30,1');
 
     // Student progress
     Route::get('/student/progress', [StudentProgressController::class, 'index']);

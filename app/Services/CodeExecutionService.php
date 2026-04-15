@@ -17,11 +17,29 @@ class CodeExecutionService
         }
 
         $remote = $this->executeViaPiston($language, $code, $input, $timeLimit);
-        if (($remote['stderr'] ?? '') !== 'Execution service unavailable') {
+        if (! $this->shouldFallbackToLocal($remote)) {
             return $remote;
         }
 
         return $this->executeLocally($language, $code, $input, $timeLimit);
+    }
+
+    private function shouldFallbackToLocal(array $remote): bool
+    {
+        $stderr = trim((string) ($remote['stderr'] ?? ''));
+        if ($stderr === 'Execution service unavailable') {
+            return true;
+        }
+
+        $stdout = trim((string) ($remote['stdout'] ?? ''));
+        $code = (int) ($remote['exit_code'] ?? 1);
+
+        // Some remote environments can return crash exit codes without any output.
+        if ($stdout === '' && $stderr === '' && $code !== 0) {
+            return true;
+        }
+
+        return false;
     }
 
     private function executeViaPiston(string $language, string $code, string $input, int $timeLimit): array
@@ -114,16 +132,25 @@ class CodeExecutionService
 
     private function runJava(string $workDir, string $code, string $input, int $timeLimit): array
     {
-        File::put($workDir.'/Solution.java', $code);
+        $className = $this->extractJavaMainClassName($code) ?? 'Solution';
+        $fileName = $className.'.java';
+        $javacBin = (string) env('JAVAC_BIN', 'javac');
+        $javaBin = (string) env('JAVA_BIN', 'java');
+
+        File::put($workDir.'/'.$fileName, $code);
 
         $compile = Process::path($workDir)
             ->timeout($timeLimit + 5)
-            ->run(['javac', 'Solution.java']);
+            ->run([$javacBin, $fileName]);
 
         if (! $compile->successful()) {
             return [
                 'stdout' => $compile->output(),
-                'stderr' => $compile->errorOutput(),
+                'stderr' => $this->normalizeProcessError(
+                    $compile->errorOutput(),
+                    $compile->exitCode(),
+                    'Java compilation failed'
+                ),
                 'exit_code' => $compile->exitCode() ?? 1,
             ];
         }
@@ -131,13 +158,41 @@ class CodeExecutionService
         $run = Process::path($workDir)
             ->timeout($timeLimit + 2)
             ->input($input)
-            ->run(['java', 'Solution']);
+            ->run([$javaBin, '-cp', $workDir, $className]);
+
+        // Retry using plain invocation for environments where -cp with absolute path behaves oddly.
+        if (! $run->successful() && trim($run->output()) === '' && trim($run->errorOutput()) === '') {
+            $run = Process::path($workDir)
+                ->timeout($timeLimit + 2)
+                ->input($input)
+                ->run([$javaBin, $className]);
+        }
 
         return [
             'stdout' => $run->output(),
-            'stderr' => $run->errorOutput(),
+            'stderr' => $this->normalizeProcessError(
+                $run->errorOutput(),
+                $run->exitCode(),
+                'Java runtime failed'
+            ),
             'exit_code' => $run->exitCode() ?? 1,
         ];
+    }
+
+    private function normalizeProcessError(?string $stderr, ?int $exitCode, string $context): string
+    {
+        $errorText = trim((string) $stderr);
+        $code = (int) ($exitCode ?? 1);
+
+        if ($errorText !== '') {
+            return $errorText;
+        }
+
+        if ($code !== 0) {
+            return $context.' (exit code '.$code.'). Check JAVA_BIN/JAVAC_BIN in .env if this persists.';
+        }
+
+        return '';
     }
 
     private function runCpp(string $workDir, string $code, string $input, int $timeLimit): array
@@ -166,5 +221,18 @@ class CodeExecutionService
             'stderr' => $run->errorOutput(),
             'exit_code' => $run->exitCode() ?? 1,
         ];
+    }
+
+    private function extractJavaMainClassName(string $code): ?string
+    {
+        if (preg_match('/public\s+class\s+([A-Za-z_][A-Za-z0-9_]*)/', $code, $matches) === 1) {
+            return $matches[1];
+        }
+
+        if (preg_match('/\bclass\s+([A-Za-z_][A-Za-z0-9_]*)/', $code, $matches) === 1) {
+            return $matches[1];
+        }
+
+        return null;
     }
 }
