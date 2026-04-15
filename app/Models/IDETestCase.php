@@ -22,6 +22,6 @@ class IDETestCase extends Model
 
     public function ideProblem(): BelongsTo
     {
-        return $this->belongsTo(IDEProblem::class);
+        return $this->belongsTo(IDEProblem::class, 'ide_problem_id', 'id');
     }
 }

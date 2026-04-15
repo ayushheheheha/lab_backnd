@@ -28,11 +28,11 @@ class IDESubmission extends Model
 
     public function ideProblem(): BelongsTo
     {
-        return $this->belongsTo(IDEProblem::class);
+        return $this->belongsTo(IDEProblem::class, 'ide_problem_id', 'id');
     }
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'user_id', 'id');
     }
 }

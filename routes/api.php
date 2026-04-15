@@ -43,8 +43,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // IDE
     Route::get('/ide-problems/{id}', [IDEController::class, 'show']);
-    Route::post('/ide-problems/{id}/run', [IDEController::class, 'run']);
-    Route::post('/ide-problems/{id}/submit', [IDEController::class, 'submit']);
+    Route::post('/ide-problems/{id}/run', [IDEController::class, 'run'])->middleware('throttle:30,1');
+    Route::post('/ide-problems/{id}/submit', [IDEController::class, 'submit'])->middleware('throttle:30,1');
     Route::get('/ide-problems/{id}/my-submissions', [IDEController::class, 'mySubmissions']);
 
     // Student progress

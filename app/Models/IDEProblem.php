@@ -38,11 +38,11 @@ class IDEProblem extends Model
 
     public function testCases(): HasMany
     {
-        return $this->hasMany(IDETestCase::class)->orderBy('position');
+        return $this->hasMany(IDETestCase::class, 'ide_problem_id', 'id')->orderBy('position');
     }
 
     public function submissions(): HasMany
     {
-        return $this->hasMany(IDESubmission::class);
+        return $this->hasMany(IDESubmission::class, 'ide_problem_id', 'id');
     }
 }

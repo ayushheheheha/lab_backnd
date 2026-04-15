@@ -1,0 +1,16 @@
+services:
+  piston-api:
+    image: ghcr.io/engineer-man/piston
+    container_name: piston-api
+    privileged: true
+    cgroup: host
+    command: ["/bin/bash", "-lc", "rm -rf /sys/fs/cgroup/isolate || true; exec /piston_api/src/docker-entrypoint.sh"]
+    ports:
+      - "2000:2000"
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - piston_data:/piston
+    restart: unless-stopped
+
+volumes:
+  piston_data:
