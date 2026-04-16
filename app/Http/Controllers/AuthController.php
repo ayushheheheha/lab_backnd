@@ -11,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Laravel\Socialite\Facades\Socialite;
 use Throwable;
@@ -225,6 +226,11 @@ class AuthController extends Controller
             return redirect($frontendUrl.'/auth/callback?token='.$encodedToken.'&user='.$encodedUser);
         } catch (Throwable $e) {
             $frontendUrl = rtrim((string) env('FRONTEND_URL', 'http://localhost:5173'), '/');
+            Log::error('Google OAuth callback failed', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
 
             return redirect($frontendUrl.'/auth/callback?error=google_auth_failed');
         }
