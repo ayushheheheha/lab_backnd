@@ -76,6 +76,7 @@ Route::middleware(['auth:sanctum', 'is_admin'])->prefix('admin')->group(function
     // Question management (inside a quiz)
     Route::get('/quizzes/{quizId}/questions', [AdminQuestionController::class, 'index']);
     Route::post('/quizzes/{quizId}/questions', [AdminQuestionController::class, 'store']);
+    Route::post('/quizzes/{quizId}/questions/import-json', [AdminQuestionController::class, 'importJson']);
     Route::get('/questions/{id}', [AdminQuestionController::class, 'show']);
     Route::put('/questions/{id}', [AdminQuestionController::class, 'update']);
     Route::delete('/questions/{id}', [AdminQuestionController::class, 'destroy']);
