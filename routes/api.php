@@ -19,6 +19,8 @@ Route::post('/auth/register', [AuthController::class, 'register'])->middleware('
 Route::post('/auth/verify-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:5,1');
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
 Route::post('/auth/resend-otp', [AuthController::class, 'resendOtp'])->middleware('throttle:3,10');
+Route::post('/auth/password/forgot', [AuthController::class, 'forgotPassword'])->middleware('throttle:3,10');
+Route::post('/auth/password/reset', [AuthController::class, 'resetPassword'])->middleware('throttle:5,10');
 Route::get('/auth/google', [AuthController::class, 'googleRedirect']);
 Route::get('/auth/google/callback', [AuthController::class, 'googleCallback'])->middleware('throttle:10,1');
 
@@ -26,6 +28,7 @@ Route::get('/auth/google/callback', [AuthController::class, 'googleCallback'])->
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);
+    Route::post('/auth/password/change', [AuthController::class, 'changePassword'])->middleware('throttle:5,10');
 
     // Courses
     Route::get('/courses', [CourseController::class, 'index']);

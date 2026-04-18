@@ -176,6 +176,100 @@ class AuthController extends Controller
         return response()->json(['message' => 'OTP resent successfully']);
     }
 
+    public function forgotPassword(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email'],
+        ]);
+
+        $user = User::where('email', $validated['email'])->first();
+
+        if (! $user) {
+            return response()->json(['error' => 'User not found'], 404);
+        }
+
+        if (! $user->email_verified_at) {
+            return response()->json(['error' => 'Please verify your email first'], 422);
+        }
+
+        if (! $user->is_active) {
+            return response()->json(['error' => 'Your account has been deactivated.'], 403);
+        }
+
+        if ($user->otp_expires_at && $user->otp_expires_at->greaterThan(now()->addMinutes(9))) {
+            return response()->json(['error' => 'Please wait before requesting another OTP'], 429);
+        }
+
+        $otp = $this->otpService->generate();
+        $this->otpService->store($user, $otp);
+        Mail::to($user->email)->send(new OtpMail($otp, $user->name));
+
+        return response()->json(['message' => 'Password reset OTP sent successfully']);
+    }
+
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email'],
+            'otp' => ['required', 'digits:6'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'password_confirmation' => ['required'],
+        ]);
+
+        $user = User::where('email', $validated['email'])->first();
+
+        if (! $user) {
+            return response()->json(['error' => 'User not found'], 404);
+        }
+
+        if (! $this->otpService->verify($user, $validated['otp'])) {
+            return response()->json(['error' => 'Invalid or expired OTP'], 422);
+        }
+
+        $user->update([
+            'password' => bcrypt($validated['password']),
+        ]);
+
+        $this->otpService->clear($user);
+        $user->tokens()->delete();
+
+        return response()->json(['message' => 'Password reset successfully. Please login again.']);
+    }
+
+    public function changePassword(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (! $user) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        if (! $user->password) {
+            return response()->json([
+                'error' => 'Password login is not enabled for this account. Use forgot password to set one.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'current_password' => ['required', 'string'],
+            'password' => ['required', 'string', 'min:8', 'confirmed', 'different:current_password'],
+            'password_confirmation' => ['required'],
+        ]);
+
+        if (! Hash::check($validated['current_password'], (string) $user->password)) {
+            return response()->json(['error' => 'Current password is incorrect'], 422);
+        }
+
+        $user->update([
+            'password' => bcrypt($validated['password']),
+        ]);
+
+        $currentTokenId = $user->currentAccessToken()?->id;
+        $user->tokens()->when($currentTokenId, fn ($query) => $query->where('id', '!=', $currentTokenId))->delete();
+
+        return response()->json(['message' => 'Password changed successfully']);
+    }
+
     public function googleRedirect(): RedirectResponse
     {
         return Socialite::driver('google')->stateless()->redirect();
