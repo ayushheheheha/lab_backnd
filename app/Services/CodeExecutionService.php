@@ -197,11 +197,14 @@ class CodeExecutionService
 
     private function runCpp(string $workDir, string $code, string $input, int $timeLimit): array
     {
+        $outputBinary = PHP_OS_FAMILY === 'Windows' ? 'main.exe' : 'main';
+        $runBinary = PHP_OS_FAMILY === 'Windows' ? 'main.exe' : './main';
+
         File::put($workDir.'/main.cpp', $code);
 
         $compile = Process::path($workDir)
             ->timeout($timeLimit + 5)
-            ->run(['g++', 'main.cpp', '-std=c++17', '-O2', '-o', 'main.exe']);
+            ->run(['g++', 'main.cpp', '-std=c++17', '-O2', '-o', $outputBinary]);
 
         if (! $compile->successful()) {
             return [
@@ -214,7 +217,7 @@ class CodeExecutionService
         $run = Process::path($workDir)
             ->timeout($timeLimit + 2)
             ->input($input)
-            ->run(['main.exe']);
+            ->run([$runBinary]);
 
         return [
             'stdout' => $run->output(),

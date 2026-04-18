@@ -21,6 +21,22 @@ class AttemptController extends Controller
     {
         $quiz = Quiz::query()->findOrFail($id);
 
+        if (! $quiz->is_active) {
+            abort(403, 'Quiz not available');
+        }
+
+        $existing = Attempt::query()
+            ->where('quiz_id', $quiz->id)
+            ->where('user_id', $request->user()->id)
+            ->where('is_complete', false)
+            ->first();
+
+        if ($existing) {
+            return response()->json([
+                'attempt_id' => $existing->id,
+            ]);
+        }
+
         $attempt = Attempt::query()->create([
             'quiz_id' => $quiz->id,
             'user_id' => $request->user()->id,
@@ -127,6 +143,12 @@ class AttemptController extends Controller
         if ((int) $attempt->user_id !== (int) $request->user()->id) {
             return response()->json([
                 'error' => 'Forbidden',
+            ], 403);
+        }
+
+        if (! $attempt->is_complete) {
+            return response()->json([
+                'error' => 'Attempt not yet submitted',
             ], 403);
         }
 

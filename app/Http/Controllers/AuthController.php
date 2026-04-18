@@ -164,8 +164,7 @@ class AuthController extends Controller
         }
 
         if ($user->otp_expires_at) {
-            $lastSentAt = $user->otp_expires_at->copy()->subMinutes(10);
-            if ($lastSentAt->greaterThan(now()->subSeconds(60))) {
+            if ($user->otp_expires_at->greaterThan(now()->addMinutes(9))) {
                 return response()->json(['error' => 'Please wait before requesting another OTP'], 429);
             }
         }
@@ -186,10 +185,15 @@ class AuthController extends Controller
     {
         try {
             $googleUser = Socialite::driver('google')->stateless()->user();
+            $frontendUrl = rtrim((string) env('FRONTEND_URL', 'http://localhost:5173'), '/');
 
             $user = User::where('google_id', $googleUser->getId())
                 ->orWhere('email', $googleUser->getEmail())
                 ->first();
+
+            if ($user && ! $user->is_active) {
+                return redirect($frontendUrl.'/auth/callback?error=account_deactivated');
+            }
 
             if ($user) {
                 if (! $user->google_id && $googleUser->getId()) {
@@ -213,7 +217,6 @@ class AuthController extends Controller
             $user->tokens()->delete();
             $token = $user->createToken('auth_token')->plainTextToken;
 
-            $frontendUrl = rtrim((string) env('FRONTEND_URL', 'http://localhost:5173'), '/');
             $encodedToken = urlencode($token);
             $encodedUser = urlencode(json_encode([
                 'id' => $user->id,

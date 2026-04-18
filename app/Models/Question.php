@@ -27,10 +27,6 @@ class Question extends Model
         'numerical_tolerance',
     ];
 
-    protected $appends = [
-        'options',
-    ];
-
     public function quiz(): BelongsTo
     {
         return $this->belongsTo(Quiz::class);
@@ -46,8 +42,4 @@ class Question extends Model
         return $this->hasMany(ShortAnswerAcceptable::class);
     }
 
-    public function getOptionsAttribute()
-    {
-        return $this->questionOptions()->get();
-    }
 }

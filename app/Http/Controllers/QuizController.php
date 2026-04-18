@@ -12,6 +12,7 @@ class QuizController extends Controller
     public function show(int $id): JsonResponse
     {
         $quiz = Quiz::query()
+            ->where('is_active', true)
             ->with([
                 'course:id,name,slug',
                 'questions' => fn ($query) => $query

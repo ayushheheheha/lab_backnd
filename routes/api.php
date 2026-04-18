@@ -15,12 +15,12 @@ use App\Http\Controllers\StudentProgressController;
 use Illuminate\Support\Facades\Route;
 
 // Public auth routes
-Route::post('/auth/register', [AuthController::class, 'register']);
-Route::post('/auth/verify-otp', [AuthController::class, 'verifyOtp']);
-Route::post('/auth/login', [AuthController::class, 'login']);
-Route::post('/auth/resend-otp', [AuthController::class, 'resendOtp']);
+Route::post('/auth/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
+Route::post('/auth/verify-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:5,1');
+Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+Route::post('/auth/resend-otp', [AuthController::class, 'resendOtp'])->middleware('throttle:3,10');
 Route::get('/auth/google', [AuthController::class, 'googleRedirect']);
-Route::get('/auth/google/callback', [AuthController::class, 'googleCallback']);
+Route::get('/auth/google/callback', [AuthController::class, 'googleCallback'])->middleware('throttle:10,1');
 
 // Authenticated student routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -76,7 +76,7 @@ Route::middleware(['auth:sanctum', 'is_admin'])->prefix('admin')->group(function
     // Question management (inside a quiz)
     Route::get('/quizzes/{quizId}/questions', [AdminQuestionController::class, 'index']);
     Route::post('/quizzes/{quizId}/questions', [AdminQuestionController::class, 'store']);
-    Route::post('/quizzes/{quizId}/questions/import-json', [AdminQuestionController::class, 'importJson']);
+    Route::post('/quizzes/{quizId}/questions/import-json', [AdminQuestionController::class, 'importJson'])->middleware('throttle:5,1');
     Route::get('/questions/{id}', [AdminQuestionController::class, 'show']);
     Route::put('/questions/{id}', [AdminQuestionController::class, 'update']);
     Route::delete('/questions/{id}', [AdminQuestionController::class, 'destroy']);

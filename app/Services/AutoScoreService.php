@@ -10,18 +10,21 @@ class AutoScoreService
     {
         $isCorrect = false;
         $marksAwarded = 0;
+        $options = $question->relationLoaded('questionOptions')
+            ? $question->questionOptions
+            : $question->questionOptions()->get();
 
         switch ($question->type) {
             case 'mcq':
             case 'true_false':
-                $correctOption = $question->options->where('is_correct', true)->first();
+                $correctOption = $options->where('is_correct', true)->first();
                 $selected = $answerData['selected_option_ids'][0] ?? null;
                 $isCorrect = $correctOption && (int) $selected === (int) $correctOption->id;
                 $marksAwarded = $isCorrect ? (float) $question->marks : 0;
                 break;
 
             case 'multi_select':
-                $correctIds = $question->options->where('is_correct', true)->pluck('id')->sort()->values()->toArray();
+                $correctIds = $options->where('is_correct', true)->pluck('id')->sort()->values()->toArray();
                 $selectedIds = collect($answerData['selected_option_ids'] ?? [])->map(fn ($id) => (int) $id)->sort()->values()->toArray();
                 $isCorrect = $correctIds === $selectedIds;
 
