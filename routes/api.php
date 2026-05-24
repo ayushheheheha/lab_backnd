@@ -5,13 +5,16 @@ use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminIDEController;
 use App\Http\Controllers\Admin\AdminQuestionController;
 use App\Http\Controllers\Admin\AdminQuizController;
+use App\Http\Controllers\Admin\AdminVideoSolutionController;
 use App\Http\Controllers\AttemptController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CodePlaygroundController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\IDEController;
+use App\Http\Controllers\LeaderboardController;
 use App\Http\Controllers\QuizController;
 use App\Http\Controllers\StudentProgressController;
+use App\Http\Controllers\VideoSolutionController;
 use Illuminate\Support\Facades\Route;
 
 // Public auth routes
@@ -56,6 +59,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/student/progress', [StudentProgressController::class, 'index']);
     Route::get('/student/profile', [StudentProgressController::class, 'profile']);
     Route::patch('/student/profile', [StudentProgressController::class, 'updateProfile']);
+
+    // Video solutions
+    Route::get('/video-solutions', [VideoSolutionController::class, 'index']);
+
+    // Leaderboard
+    Route::get('/leaderboard', [LeaderboardController::class, 'index']);
 });
 
 // Admin routes
@@ -94,4 +103,10 @@ Route::middleware(['auth:sanctum', 'is_admin'])->prefix('admin')->group(function
     Route::post('/ide-problems/{id}/test-cases', [AdminIDEController::class, 'addTestCase']);
     Route::put('/test-cases/{id}', [AdminIDEController::class, 'updateTestCase']);
     Route::delete('/test-cases/{id}', [AdminIDEController::class, 'deleteTestCase']);
+
+    // Video solution management
+    Route::get('/video-solutions', [AdminVideoSolutionController::class, 'index']);
+    Route::post('/video-solutions', [AdminVideoSolutionController::class, 'store']);
+    Route::put('/video-solutions/{id}', [AdminVideoSolutionController::class, 'update']);
+    Route::delete('/video-solutions/{id}', [AdminVideoSolutionController::class, 'destroy']);
 });
