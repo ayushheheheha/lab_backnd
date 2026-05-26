@@ -21,6 +21,14 @@ class Attempt extends Model
         'is_complete',
     ];
 
+    protected $casts = [
+        'started_at'   => 'datetime',
+        'submitted_at' => 'datetime',
+        'is_complete'  => 'boolean',
+        'score'        => 'float',
+        'total_marks'  => 'float',
+    ];
+
     public function quiz(): BelongsTo
     {
         return $this->belongsTo(Quiz::class);

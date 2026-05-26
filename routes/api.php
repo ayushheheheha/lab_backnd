@@ -10,6 +10,7 @@ use App\Http\Controllers\AttemptController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CodePlaygroundController;
 use App\Http\Controllers\CourseController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\IDEController;
 use App\Http\Controllers\LeaderboardController;
 use App\Http\Controllers\QuizController;
@@ -59,6 +60,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/student/progress', [StudentProgressController::class, 'index']);
     Route::get('/student/profile', [StudentProgressController::class, 'profile']);
     Route::patch('/student/profile', [StudentProgressController::class, 'updateProfile']);
+    Route::get('/student/dashboard', [DashboardController::class, 'index']);
 
     // Video solutions
     Route::get('/video-solutions', [VideoSolutionController::class, 'index']);
