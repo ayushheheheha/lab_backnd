@@ -11,6 +11,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CodePlaygroundController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DiscussionController;
 use App\Http\Controllers\IDEController;
 use App\Http\Controllers\LeaderboardController;
 use App\Http\Controllers\QuizController;
@@ -67,6 +68,20 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Leaderboard
     Route::get('/leaderboard', [LeaderboardController::class, 'index']);
+
+    // Discussions
+    Route::get('/discussions/subjects', [DiscussionController::class, 'subjects']);
+    Route::get('/discussions', [DiscussionController::class, 'index']);
+    Route::post('/discussions', [DiscussionController::class, 'store'])->middleware('throttle:10,1');
+    Route::get('/discussions/{id}', [DiscussionController::class, 'show'])->whereNumber('id');
+    Route::delete('/discussions/{id}', [DiscussionController::class, 'destroy'])->whereNumber('id');
+    Route::post('/discussions/{id}/replies', [DiscussionController::class, 'reply'])->whereNumber('id')->middleware('throttle:20,1');
+    Route::delete('/discussions/replies/{id}', [DiscussionController::class, 'destroyReply'])->whereNumber('id');
+    Route::post('/discussions/{id}/vote', [DiscussionController::class, 'voteDiscussion'])->whereNumber('id');
+    Route::post('/discussions/replies/{id}/vote', [DiscussionController::class, 'voteReply'])->whereNumber('id');
+    Route::post('/discussions/{id}/accept', [DiscussionController::class, 'accept'])->whereNumber('id');
+    Route::post('/discussions/{id}/unaccept', [DiscussionController::class, 'unaccept'])->whereNumber('id');
+    Route::post('/discussions/replies/{id}/endorse', [DiscussionController::class, 'endorse'])->whereNumber('id');
 });
 
 // Admin routes
