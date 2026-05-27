@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
 use App\Mail\OtpMail;
+use App\Models\LoginLog;
 use App\Models\User;
 use App\Services\OtpService;
+use App\Services\XpService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
@@ -134,6 +136,13 @@ class AuthController extends Controller
 
         $user->tokens()->delete();
         $token = $user->createToken('auth_token')->plainTextToken;
+
+        LoginLog::create([
+            'user_id'     => $user->id,
+            'ip_address'  => request()->ip(),
+            'user_agent'  => substr((string) request()->userAgent(), 0, 300),
+            'auth_method' => 'email',
+        ]);
 
         return response()->json([
             'token' => $token,
@@ -270,9 +279,14 @@ class AuthController extends Controller
         return response()->json(['message' => 'Password changed successfully']);
     }
 
-    public function googleRedirect(): RedirectResponse
+    public function googleRedirect(): RedirectResponse|\Illuminate\Http\JsonResponse
     {
-        return Socialite::driver('google')->stateless()->redirect();
+        try {
+            return Socialite::driver('google')->stateless()->redirect();
+        } catch (Throwable $e) {
+            Log::error('Google OAuth redirect failed', ['message' => $e->getMessage()]);
+            return response()->json(['message' => 'Google OAuth is not configured correctly.'], 500);
+        }
     }
 
     public function googleCallback(): RedirectResponse
@@ -311,6 +325,13 @@ class AuthController extends Controller
             $user->tokens()->delete();
             $token = $user->createToken('auth_token')->plainTextToken;
 
+            LoginLog::create([
+                'user_id'     => $user->id,
+                'ip_address'  => request()->ip(),
+                'user_agent'  => substr((string) request()->userAgent(), 0, 300),
+                'auth_method' => 'google',
+            ]);
+
             $encodedToken = urlencode($token);
             $encodedUser = urlencode(json_encode([
                 'id' => $user->id,
@@ -346,6 +367,8 @@ class AuthController extends Controller
     public function me(Request $request): JsonResponse
     {
         $user = $request->user();
+        $xp = (int) ($user?->xp ?? 0);
+        $progress = XpService::progress($xp);
 
         return response()->json([
             'user' => [
@@ -355,6 +378,10 @@ class AuthController extends Controller
                 'is_admin' => $user?->is_admin,
                 'avatar' => $user?->avatar,
                 'email_verified_at' => $user?->email_verified_at,
+                'xp' => $xp,
+                'level' => $progress['level'],
+                'level_progress' => $progress,
+                'badges' => XpService::badgesForLevel($progress['level']),
             ],
         ]);
     }

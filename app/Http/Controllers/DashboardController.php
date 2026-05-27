@@ -26,6 +26,7 @@ class DashboardController extends Controller
             'rank'             => $this->rankWidget($user->id, $now),
             'performance'      => $this->performance($user->id, $now),
             'todays_challenge' => $this->todaysChallenge($user->id),
+            'active_now'       => $this->activeNow($now),
         ]);
     }
 
@@ -331,5 +332,25 @@ class DashboardController extends Controller
             'time_limit_minutes' => $quiz->time_limit_minutes,
             'xp'                 => 200,
         ];
+    }
+
+    private function activeNow(Carbon $now): int
+    {
+        $since = $now->copy()->subMinutes(15);
+
+        $quizUsers = Attempt::query()
+            ->where('is_complete', true)
+            ->whereNotNull('submitted_at')
+            ->where('submitted_at', '>=', $since)
+            ->distinct()
+            ->pluck('user_id');
+
+        $ideUsers = IDESubmission::query()
+            ->whereNotNull('submitted_at')
+            ->where('submitted_at', '>=', $since)
+            ->distinct()
+            ->pluck('user_id');
+
+        return $quizUsers->merge($ideUsers)->unique()->count();
     }
 }

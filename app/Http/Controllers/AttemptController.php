@@ -6,6 +6,7 @@ use App\Models\Attempt;
 use App\Models\AttemptAnswer;
 use App\Models\Quiz;
 use App\Services\AutoScoreService;
+use App\Services\XpService;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,8 +14,10 @@ use Illuminate\Support\Facades\DB;
 
 class AttemptController extends Controller
 {
-    public function __construct(private readonly AutoScoreService $autoScoreService)
-    {
+    public function __construct(
+        private readonly AutoScoreService $autoScoreService,
+        private readonly XpService $xpService,
+    ) {
     }
 
     public function start(Request $request, int $id): JsonResponse
@@ -120,12 +123,34 @@ class AttemptController extends Controller
         $score = (float) $attempt->fresh()->score;
         $percentage = $totalMarks > 0 ? round(($score / $totalMarks) * 100, 2) : 0;
 
+        $xpEnvelope = $this->awardQuizXp($request->user(), $attempt->quiz_id, $percentage);
+
         return response()->json([
             'attempt_id' => $attempt->id,
             'score' => $score,
             'total_marks' => $totalMarks,
             'percentage' => $percentage,
+            'xp_award' => $xpEnvelope,
         ]);
+    }
+
+    private function awardQuizXp($user, int $quizId, float $percentage): array
+    {
+        // First completed attempt on this quiz pays full, re-attempts pay half.
+        $priorCount = Attempt::query()
+            ->where('user_id', $user->id)
+            ->where('quiz_id', $quizId)
+            ->where('is_complete', true)
+            ->count();
+        $isFirst = $priorCount <= 1;
+
+        $base = XpService::XP_QUIZ_BASE + (int) round(max(0.0, $percentage) / 5);
+        $amount = $isFirst ? $base : (int) max(1, round($base * XpService::XP_QUIZ_REATTEMPT_FACTOR));
+
+        $reward = $this->xpService->award($user, $amount, $isFirst ? 'quiz_first' : 'quiz_reattempt');
+        $daily = $this->xpService->applyDailyBonusIfFirstToday($user);
+
+        return $this->xpService->combine($reward, $daily);
     }
 
     public function result(Request $request, int $id): JsonResponse

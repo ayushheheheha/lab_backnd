@@ -126,4 +126,7 @@ Route::middleware(['auth:sanctum', 'is_admin'])->prefix('admin')->group(function
     Route::post('/video-solutions', [AdminVideoSolutionController::class, 'store']);
     Route::put('/video-solutions/{id}', [AdminVideoSolutionController::class, 'update']);
     Route::delete('/video-solutions/{id}', [AdminVideoSolutionController::class, 'destroy']);
+
+    // User management
+    Route::post('/users/{userId}/grant-admin', [AdminDashboardController::class, 'grantAdmin']);
 });

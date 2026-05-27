@@ -27,6 +27,9 @@ class User extends Authenticatable
         'email_verified_at',
         'otp',
         'otp_expires_at',
+        'xp',
+        'last_xp_action_date',
+        'highest_level_reached',
     ];
 
     /**
@@ -51,6 +54,9 @@ class User extends Authenticatable
             'is_admin' => 'boolean',
             'email_verified_at' => 'datetime',
             'otp_expires_at' => 'datetime',
+            'last_xp_action_date' => 'date',
+            'xp' => 'integer',
+            'highest_level_reached' => 'integer',
             'password' => 'hashed',
         ];
     }

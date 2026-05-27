@@ -6,13 +6,16 @@ use App\Models\Course;
 use App\Models\IDEProblem;
 use App\Models\IDESubmission;
 use App\Services\CodeExecutionService;
+use App\Services\XpService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class IDEController extends Controller
 {
-    public function __construct(private readonly CodeExecutionService $executionService)
-    {
+    public function __construct(
+        private readonly CodeExecutionService $executionService,
+        private readonly XpService $xpService,
+    ) {
     }
 
     public function bySlug(string $slug): JsonResponse
@@ -200,6 +203,12 @@ class IDEController extends Controller
             }
         }
 
+        $hadPriorAccepted = IDESubmission::query()
+            ->where('ide_problem_id', $problem->id)
+            ->where('user_id', $request->user()->id)
+            ->where('status', 'accepted')
+            ->exists();
+
         $submission = IDESubmission::query()->create([
             'ide_problem_id' => $problem->id,
             'user_id' => $request->user()->id,
@@ -210,12 +219,25 @@ class IDEController extends Controller
             'submitted_at' => now(),
         ]);
 
+        $xpEnvelope = null;
+        if ($status === 'accepted' && ! $hadPriorAccepted) {
+            $amount = match (strtolower((string) $problem->difficulty)) {
+                'hard' => XpService::XP_IDE_HARD,
+                'medium' => XpService::XP_IDE_MEDIUM,
+                default => XpService::XP_IDE_EASY,
+            };
+            $reward = $this->xpService->award($request->user(), $amount, 'ide_first_ac');
+            $daily = $this->xpService->applyDailyBonusIfFirstToday($request->user());
+            $xpEnvelope = $this->xpService->combine($reward, $daily);
+        }
+
         return response()->json([
             'submission_id' => $submission->id,
             'status' => $status,
             'test_results' => $results,
             'total_cases' => count($results),
             'passed_cases' => $passedCases,
+            'xp_award' => $xpEnvelope,
         ]);
     }
 

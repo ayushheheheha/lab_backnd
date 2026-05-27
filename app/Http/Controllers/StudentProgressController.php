@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Attempt;
 use App\Models\Course;
 use App\Models\IDESubmission;
+use App\Services\XpService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -200,6 +201,9 @@ class StudentProgressController extends Controller
             ->distinct('ide_problem_id')
             ->count('ide_problem_id');
 
+        $xp = (int) ($user->xp ?? 0);
+        $progress = XpService::progress($xp);
+
         return response()->json([
             'user' => [
                 'id' => $user->id,
@@ -214,7 +218,30 @@ class StudentProgressController extends Controller
                 'best_percentage' => round((float) ($bestPercentage ?? 0), 2),
                 'ide_solved' => $ideAccepted,
             ],
+            'xp' => [
+                'xp' => $xp,
+                'level' => $progress['level'],
+                'progress' => $progress,
+                'badges' => XpService::badgeCatalog($progress['level']),
+                'next_badge' => $this->nextBadge($progress['level']),
+            ],
         ]);
+    }
+
+    private function nextBadge(int $level): ?array
+    {
+        foreach (XpService::BADGES as $threshold => [$slug, $label, $description]) {
+            if ($threshold > $level) {
+                return [
+                    'slug' => $slug,
+                    'label' => $label,
+                    'description' => $description,
+                    'level' => $threshold,
+                    'levels_remaining' => $threshold - $level,
+                ];
+            }
+        }
+        return null;
     }
 
     public function updateProfile(Request $request): JsonResponse

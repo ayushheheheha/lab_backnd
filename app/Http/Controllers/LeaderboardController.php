@@ -2,55 +2,58 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Attempt;
 use App\Models\User;
+use App\Services\XpService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class LeaderboardController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $viewer = $request->user();
 
-        $rows = Attempt::query()
-            ->where('is_complete', true)
-            ->whereNotNull('submitted_at')
-            ->whereNotNull('total_marks')
-            ->where('total_marks', '>', 0)
-            ->join('users', 'users.id', '=', 'attempts.user_id')
-            ->select(
-                'attempts.user_id',
-                'users.name',
-                DB::raw('ROUND(AVG((attempts.score / attempts.total_marks) * 100), 1) as avg_score'),
-                DB::raw('COUNT(*) as attempt_count')
-            )
-            ->groupBy('attempts.user_id', 'users.name')
-            ->orderByDesc('avg_score')
-            ->orderByDesc('attempt_count')
+        $rows = User::query()
+            ->where('is_active', true)
+            ->where('is_admin', false)
+            ->where('xp', '>', 0)
+            ->orderByDesc('xp')
+            ->orderBy('id')
             ->limit(50)
-            ->get();
+            ->get(['id', 'name', 'avatar', 'xp']);
 
-        $leaderboard = $rows->values()->map(function ($row, $index) {
+        $leaderboard = $rows->values()->map(function ($u, $index) {
+            $level = XpService::levelFromXp((int) $u->xp);
             return [
-                'rank'          => $index + 1,
-                'user_id'       => $row->user_id,
-                'name'          => $row->name,
-                'avg_score'     => (float) $row->avg_score,
-                'attempt_count' => (int) $row->attempt_count,
+                'rank'    => $index + 1,
+                'user_id' => $u->id,
+                'name'    => $u->name,
+                'avatar'  => $u->avatar,
+                'xp'      => (int) $u->xp,
+                'level'   => $level,
             ];
         });
 
-        $myRank = null;
-        $found = $leaderboard->firstWhere('user_id', $user->id);
-        if ($found) {
-            $myRank = $found['rank'];
+        $myRow = $leaderboard->firstWhere('user_id', $viewer->id);
+        $myRank = $myRow['rank'] ?? null;
+
+        if (! $myRank) {
+            $myXp = (int) ($viewer->xp ?? 0);
+            $ahead = User::query()
+                ->where('is_active', true)
+                ->where('is_admin', false)
+                ->where('xp', '>', $myXp)
+                ->count();
+            $myRank = $myXp > 0 ? $ahead + 1 : null;
         }
 
         return response()->json([
             'leaderboard' => $leaderboard,
             'my_rank'     => $myRank,
+            'me' => [
+                'xp' => (int) ($viewer->xp ?? 0),
+                'level' => XpService::levelFromXp((int) ($viewer->xp ?? 0)),
+            ],
         ]);
     }
 }

@@ -7,6 +7,7 @@ use App\Models\Discussion;
 use App\Models\DiscussionReply;
 use App\Models\DiscussionVote;
 use App\Models\User;
+use App\Services\XpService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +15,8 @@ use Illuminate\Validation\Rule;
 
 class DiscussionController extends Controller
 {
-    private const XP_ON_ACCEPT = 50;
+    private const XP_ON_ACCEPT = XpService::XP_ON_ACCEPTED_REPLY;
+    private const XP_PER_UPVOTE = XpService::XP_PER_UPVOTE_RECEIVED;
 
     public function index(Request $request): JsonResponse
     {
@@ -233,8 +235,9 @@ class DiscussionController extends Controller
     {
         $discussion = Discussion::findOrFail($id);
         $userId     = $request->user()->id;
+        $authorId   = (int) $discussion->user_id;
 
-        return DB::transaction(function () use ($discussion, $userId) {
+        return DB::transaction(function () use ($discussion, $userId, $authorId) {
             $existing = DiscussionVote::where('user_id', $userId)
                 ->where('votable_type', Discussion::class)
                 ->where('votable_id', $discussion->id)
@@ -243,6 +246,9 @@ class DiscussionController extends Controller
             if ($existing) {
                 $existing->delete();
                 $discussion->decrement('vote_count');
+                if ($authorId !== $userId) {
+                    User::where('id', $authorId)->decrement('xp', self::XP_PER_UPVOTE);
+                }
                 return response()->json(['voted' => false, 'count' => max(0, $discussion->vote_count - 1)]);
             }
 
@@ -252,16 +258,20 @@ class DiscussionController extends Controller
                 'votable_id'   => $discussion->id,
             ]);
             $discussion->increment('vote_count');
+            if ($authorId !== $userId) {
+                User::where('id', $authorId)->increment('xp', self::XP_PER_UPVOTE);
+            }
             return response()->json(['voted' => true, 'count' => $discussion->vote_count + 1]);
         });
     }
 
     public function voteReply(Request $request, int $id): JsonResponse
     {
-        $reply  = DiscussionReply::findOrFail($id);
-        $userId = $request->user()->id;
+        $reply    = DiscussionReply::findOrFail($id);
+        $userId   = $request->user()->id;
+        $authorId = (int) $reply->user_id;
 
-        return DB::transaction(function () use ($reply, $userId) {
+        return DB::transaction(function () use ($reply, $userId, $authorId) {
             $existing = DiscussionVote::where('user_id', $userId)
                 ->where('votable_type', DiscussionReply::class)
                 ->where('votable_id', $reply->id)
@@ -270,6 +280,9 @@ class DiscussionController extends Controller
             if ($existing) {
                 $existing->delete();
                 $reply->decrement('vote_count');
+                if ($authorId !== $userId) {
+                    User::where('id', $authorId)->decrement('xp', self::XP_PER_UPVOTE);
+                }
                 return response()->json(['voted' => false, 'count' => max(0, $reply->vote_count - 1)]);
             }
 
@@ -279,6 +292,9 @@ class DiscussionController extends Controller
                 'votable_id'   => $reply->id,
             ]);
             $reply->increment('vote_count');
+            if ($authorId !== $userId) {
+                User::where('id', $authorId)->increment('xp', self::XP_PER_UPVOTE);
+            }
             return response()->json(['voted' => true, 'count' => $reply->vote_count + 1]);
         });
     }
