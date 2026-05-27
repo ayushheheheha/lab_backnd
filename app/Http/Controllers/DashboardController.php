@@ -27,6 +27,7 @@ class DashboardController extends Controller
             'performance'      => $this->performance($user->id, $now),
             'todays_challenge' => $this->todaysChallenge($user->id),
             'active_now'       => $this->activeNow($now),
+            'community_feed'   => $this->communityFeed($now),
         ]);
     }
 
@@ -332,6 +333,45 @@ class DashboardController extends Controller
             'time_limit_minutes' => $quiz->time_limit_minutes,
             'xp'                 => 200,
         ];
+    }
+
+    private function communityFeed(Carbon $now): array
+    {
+        return Attempt::query()
+            ->where('is_complete', true)
+            ->whereNotNull('submitted_at')
+            ->whereHas('user', fn ($q) => $q->where('is_admin', false)->where('is_active', true))
+            ->with([
+                'user:id,name',
+                'quiz:id,course_id,title',
+                'quiz.course:id,name',
+            ])
+            ->orderByDesc('submitted_at')
+            ->limit(25)
+            ->get()
+            ->map(function (Attempt $a) {
+                $rawName = $a->user?->name ?? 'A Student';
+                $parts   = preg_split('/\s+/', trim($rawName));
+                $display = $parts[0];
+                if (count($parts) > 1) {
+                    $display .= ' ' . strtoupper(substr(end($parts), 0, 1)) . '.';
+                }
+
+                $score = (float) ($a->score ?? 0);
+                $total = (float) ($a->total_marks ?? 0);
+                $pct   = $total > 0 ? round(($score / $total) * 100, 1) : 0;
+
+                return [
+                    'name'         => $display,
+                    'course_name'  => $a->quiz?->course?->name ?? '',
+                    'quiz_title'   => $a->quiz?->title ?? '',
+                    'percentage'   => $pct,
+                    'submitted_at' => $a->submitted_at,
+                    'xp'           => 5 + (int) round($pct / 5),
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     private function activeNow(Carbon $now): int
