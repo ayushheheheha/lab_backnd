@@ -8,6 +8,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
+
+
 class AdminQuizController extends Controller
 {
     public function index(Request $request): JsonResponse
@@ -45,15 +47,15 @@ class AdminQuizController extends Controller
     {
         $validated = $request->validate([
             'course_id' => ['required', 'exists:courses,id'],
-            'section' => ['required', Rule::in(['practice', 'quiz1', 'quiz2', 'endterm'])],
-            'week_id' => ['nullable', 'exists:weeks,id', 'required_if:section,practice'],
+            'section' => ['required', Rule::in(Quiz::SECTIONS)],
+            'week_id' => ['nullable', 'exists:weeks,id', Rule::requiredIf(fn () => in_array($request->input('section'), Quiz::WEEKLY_SECTIONS, true))],
             'title' => ['required', 'string', 'max:200'],
             'description' => ['nullable', 'string'],
             'time_limit_minutes' => ['nullable', 'integer', 'min:1', 'max:300'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
 
-        if (($validated['section'] ?? null) !== 'practice') {
+        if (! in_array($validated['section'] ?? null, Quiz::WEEKLY_SECTIONS, true)) {
             $validated['week_id'] = null;
         }
 
@@ -90,7 +92,7 @@ class AdminQuizController extends Controller
 
         $validated = $request->validate([
             'course_id' => ['sometimes', 'required', 'exists:courses,id'],
-            'section' => ['sometimes', 'required', Rule::in(['practice', 'quiz1', 'quiz2', 'endterm'])],
+            'section' => ['sometimes', 'required', Rule::in(Quiz::SECTIONS)],
             'week_id' => ['nullable', 'exists:weeks,id'],
             'title' => ['sometimes', 'required', 'string', 'max:200'],
             'description' => ['nullable', 'string'],
@@ -99,15 +101,16 @@ class AdminQuizController extends Controller
         ]);
 
         $nextSection = $validated['section'] ?? $quiz->section;
-        if ($nextSection !== 'practice') {
+        $needsWeek = in_array($nextSection, Quiz::WEEKLY_SECTIONS, true);
+        if (! $needsWeek) {
             $validated['week_id'] = null;
         }
 
-        if ($nextSection === 'practice' && ! array_key_exists('week_id', $validated) && ! $quiz->week_id) {
+        if ($needsWeek && ! array_key_exists('week_id', $validated) && ! $quiz->week_id) {
             return response()->json([
-                'message' => 'The week_id field is required when section is practice.',
+                'message' => 'The week_id field is required for weekly sections (practice, practice_graded).',
                 'errors' => [
-                    'week_id' => ['The week_id field is required when section is practice.'],
+                    'week_id' => ['The week_id field is required for weekly sections.'],
                 ],
             ], 422);
         }

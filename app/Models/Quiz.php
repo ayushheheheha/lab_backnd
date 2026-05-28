@@ -11,6 +11,9 @@ class Quiz extends Model
 {
     use HasFactory;
 
+    public const SECTIONS = ['practice', 'practice_graded', 'quiz1', 'quiz2', 'endterm', 'mock_test'];
+    public const WEEKLY_SECTIONS = ['practice', 'practice_graded'];
+
     protected $fillable = [
         'course_id',
         'week_id',

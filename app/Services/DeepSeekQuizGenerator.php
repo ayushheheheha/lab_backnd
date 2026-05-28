@@ -172,6 +172,27 @@ Procedures, pseudocode listings, and program snippets MUST go into "stem_code" v
 Indentation in stem_code: preserve any indentation from the PDF. If the PDF has no indentation but the code has clear block structure (lines inside if/while/for/procedure bodies), add 2-space indentation per nesting level so the block structure is visually clear. Example:
   while(Pile 1 has more cards){\n  Read the top card X from Pile 1\n  if(X.ShopName == Y.ShopName){\n    count = count + 1\n  }\n  Move card X to Pile 2\n}
 
+IMPORTANT: Do NOT include line numbers in stem_code. The rendering system adds line numbers automatically. Only the raw code/pseudocode lines belong in stem_code — no "1.", "1:", "1 ", or any numeric prefix on any line.
+
+CRITICAL RULE: NUMBERED PSEUDOCODE LINES — STRIP LINE NUMBERS
+==============================================================
+Many PDFs print pseudocode with line numbers on the left side (e.g. "1 count = 0", "2 while(Table 1 has more rows){"). PDF text extraction sometimes separates the numbers from the actual code, delivering them as a block of bare numbers followed by the code text, or as prefixed lines. YOU MUST:
+
+1. STRIP all leading line-number prefixes from pseudocode lines before putting them in stem_code.
+   WRONG stem_code: "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12"   ← bare numbers only — NEVER output this
+   WRONG stem_code: "1 count = 0\n2 while(Table 1 has more rows){"   ← numbers still attached
+   CORRECT stem_code: "count = 0\nwhile(Table 1 has more rows){"    ← clean code, no numbers
+
+2. If the extracted text for a code block is ONLY numbers (1, 2, 3 … N) with no code text on the same lines, the extraction failed. In that case look elsewhere in the PDF text for the actual code lines (they may appear later in the text stream). Reconstruct the pseudocode from the surrounding text as best you can. If truly unrecoverable, set stem_code: "" and add "(Pseudocode could not be extracted from PDF)" to the stem.
+
+3. NEVER store bare line numbers as the stem_code content. A stem_code of "1\n2\n3..." is always wrong.
+
+WORKED EXAMPLE — numbered pseudocode in PDF text:
+PDF text extracted: "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\ncount = 0\nwhile(Table 1 has more rows){\n  Read the first row X in Table 1\n  foreach c in S{\n    if (X.SeqNo == c){\n      if(X.Mathematics < 75 and X.Physics < 75){\n        count = count + 1\n      }\n    }\n  }\n  Move X to Table 2\n}"
+
+Correct stem_code output:
+"count = 0\nwhile(Table 1 has more rows){\n  Read the first row X in Table 1\n  foreach c in S{\n    if (X.SeqNo == c){\n      if(X.Mathematics < 75 and X.Physics < 75){\n        count = count + 1\n      }\n    }\n  }\n  Move X to Table 2\n}"
+
 MATHEMATICAL NOTATION — MANDATORY
 ==================================
 Any math in the PDF (fractions, exponents, subscripts, Greek letters, set notation, probabilities, combinatorics, summations, integrals, etc.) MUST be wrapped in LaTeX dollar delimiters inside the string:
@@ -291,16 +312,28 @@ WORKED EXAMPLE — STANDALONE NUMERICAL
   "difficulty": "easy"
 }
 
+CRITICAL RULE: ZERO HALLUCINATION — OPTIONS AND ANSWERS MUST BE VERBATIM
+=========================================================================
+Every option string MUST be copied CHARACTER-FOR-CHARACTER from the PDF. You are a transcription engine, not a paraphrasing engine. Do NOT:
+- Reword, summarize, or "improve" any option text.
+- Swap "less than" ↔ "more than", change variable names, change subject names, or alter any comparison.
+- Invent an option that is not in the PDF.
+- Merge two options into one or split one option into two.
+The number of options in your output MUST match the number of options shown in the PDF for that question.
+
+If option text in the PDF is long (wraps across lines), join the continuation into one string — do NOT split it into two options.
+
 FINAL CHECKS BEFORE RETURNING
 ==============================
 - Output is a single JSON object — nothing else.
 - Every question has a "type" from the supported list.
 - Tables are in "stem_table" with proper headers/rows arrays (NOT flattened to text).
-- Procedures/pseudocode are in "stem_code" (NOT pasted into stem).
+- Procedures/pseudocode are in "stem_code" (NOT pasted into stem). stem_code never contains bare line numbers only.
 - Math is wrapped in $...$ everywhere it appears.
 - Shared context is split into ONE comprehension question followed by independent sub-questions.
 - Answers from the answer key are filled in the correct field for the question type.
 - Question order matches the PDF order.
+- Options are verbatim from the PDF — count, wording, and direction (less/more/equal) are preserved exactly.
 PROMPT;
 
     public function generateFromText(string $pdfText): array

@@ -30,14 +30,15 @@ class PdfQuizImportController extends Controller
         $validated = $request->validate([
             'pdf' => ['required', 'file', 'mimetypes:application/pdf', 'mimes:pdf', 'max:10240'],
             'course_id' => ['required', 'integer', 'exists:courses,id'],
-            'section' => ['required', Rule::in(['practice', 'quiz1', 'quiz2', 'endterm'])],
+            'section' => ['required', Rule::in(Quiz::SECTIONS)],
             'week_id' => ['nullable', 'integer', 'exists:weeks,id'],
             'title_override' => ['nullable', 'string', 'max:200'],
         ]);
 
-        if ($validated['section'] === 'practice' && empty($validated['week_id'])) {
+        $needsWeek = in_array($validated['section'], Quiz::WEEKLY_SECTIONS, true);
+        if ($needsWeek && empty($validated['week_id'])) {
             return response()->json([
-                'error' => 'Week is required for the practice section.',
+                'error' => 'Week is required for the '.$validated['section'].' section.',
             ], 422);
         }
 
@@ -76,10 +77,10 @@ class PdfQuizImportController extends Controller
             $titleOverride = trim((string) ($validated['title_override'] ?? ''));
             $finalTitle = $titleOverride !== '' ? $titleOverride : trim((string) $generated['quiz_title']);
 
-            $quiz = DB::transaction(function () use ($validated, $finalTitle, $normalizedRows, $importer) {
+            $quiz = DB::transaction(function () use ($validated, $needsWeek, $finalTitle, $normalizedRows, $importer) {
                 $quiz = Quiz::query()->create([
                     'course_id' => (int) $validated['course_id'],
-                    'week_id' => $validated['section'] === 'practice' ? (int) $validated['week_id'] : null,
+                    'week_id' => $needsWeek ? (int) $validated['week_id'] : null,
                     'section' => $validated['section'],
                     'title' => $finalTitle,
                     'description' => null,

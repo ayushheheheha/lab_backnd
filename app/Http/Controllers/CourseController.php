@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Attempt;
 use App\Models\Course;
+use App\Models\Quiz;
 use App\Models\Week;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -89,7 +90,7 @@ class CourseController extends Controller
 
         $quizzes = $course->quizzes()
             ->where('week_id', $week->id)
-            ->where('section', 'practice')
+            ->whereIn('section', Quiz::WEEKLY_SECTIONS)
             ->where('is_active', true)
             ->withCount('questions')
             ->orderBy('id')
@@ -98,8 +99,8 @@ class CourseController extends Controller
                 'title',
                 'description',
                 'time_limit_minutes',
-            ])
-            ->values();
+                'section',
+            ]);
 
         $attemptMeta = Attempt::query()
             ->where('user_id', $user->id)
@@ -111,20 +112,22 @@ class CourseController extends Controller
             ->get()
             ->keyBy('quiz_id');
 
-        $quizzes = $quizzes
-            ->map(fn ($quiz) => [
-                'id' => $quiz->id,
-                'title' => $quiz->title,
-                'description' => $quiz->description,
-                'time_limit_minutes' => $quiz->time_limit_minutes,
-                'question_count' => $quiz->questions_count,
-                'user_has_attempted' => $attemptMeta->has($quiz->id),
-                'attempt_count' => (int) ($attemptMeta->get($quiz->id)?->attempt_count ?? 0),
-                'last_submitted_at' => $attemptMeta->get($quiz->id)?->last_submitted_at,
-            ])
-            ->values();
+        $mapped = $quizzes->map(fn ($quiz) => [
+            'id' => $quiz->id,
+            'title' => $quiz->title,
+            'description' => $quiz->description,
+            'time_limit_minutes' => $quiz->time_limit_minutes,
+            'question_count' => $quiz->questions_count,
+            'section' => $quiz->section,
+            'user_has_attempted' => $attemptMeta->has($quiz->id),
+            'attempt_count' => (int) ($attemptMeta->get($quiz->id)?->attempt_count ?? 0),
+            'last_submitted_at' => $attemptMeta->get($quiz->id)?->last_submitted_at,
+        ]);
 
-        return response()->json($quizzes);
+        return response()->json([
+            'practice' => $mapped->where('section', 'practice')->values(),
+            'graded' => $mapped->where('section', 'practice_graded')->values(),
+        ]);
     }
 
     public function examPrep(Request $request, string $slug): JsonResponse
@@ -137,7 +140,7 @@ class CourseController extends Controller
             ->firstOrFail();
 
         $allQuizzes = $course->quizzes()
-            ->whereIn('section', ['quiz1', 'quiz2', 'endterm'])
+            ->whereIn('section', ['quiz1', 'quiz2', 'endterm', 'mock_test'])
             ->where('is_active', true)
             ->withCount('questions')
             ->orderBy('id')
@@ -177,6 +180,7 @@ class CourseController extends Controller
             'quiz1' => $bySection('quiz1'),
             'quiz2' => $bySection('quiz2'),
             'endterm' => $bySection('endterm'),
+            'mock_test' => $bySection('mock_test'),
         ]);
     }
 }
