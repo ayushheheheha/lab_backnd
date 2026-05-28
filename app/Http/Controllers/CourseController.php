@@ -127,15 +127,17 @@ class CourseController extends Controller
         return response()->json($quizzes);
     }
 
-    public function examPrep(string $slug): JsonResponse
+    public function examPrep(Request $request, string $slug): JsonResponse
     {
+        $user = $request->user();
+
         $course = Course::query()
             ->where('slug', $slug)
             ->where('is_active', true)
             ->firstOrFail();
 
-        $mapSection = fn (string $section) => $course->quizzes()
-            ->where('section', $section)
+        $allQuizzes = $course->quizzes()
+            ->whereIn('section', ['quiz1', 'quiz2', 'endterm'])
             ->where('is_active', true)
             ->withCount('questions')
             ->orderBy('id')
@@ -144,20 +146,37 @@ class CourseController extends Controller
                 'title',
                 'description',
                 'time_limit_minutes',
-            ])
-            ->map(fn ($quiz) => [
-                'id' => $quiz->id,
-                'title' => $quiz->title,
-                'description' => $quiz->description,
-                'time_limit_minutes' => $quiz->time_limit_minutes,
-                'question_count' => $quiz->questions_count,
-            ])
-            ->values();
+                'section',
+            ]);
+
+        $attemptMeta = Attempt::query()
+            ->where('user_id', $user->id)
+            ->whereIn('quiz_id', $allQuizzes->pluck('id'))
+            ->where('is_complete', true)
+            ->whereNotNull('submitted_at')
+            ->selectRaw('quiz_id, MAX(submitted_at) as last_submitted_at, COUNT(*) as attempt_count')
+            ->groupBy('quiz_id')
+            ->get()
+            ->keyBy('quiz_id');
+
+        $mapped = $allQuizzes->map(fn ($quiz) => [
+            'id' => $quiz->id,
+            'title' => $quiz->title,
+            'description' => $quiz->description,
+            'time_limit_minutes' => $quiz->time_limit_minutes,
+            'question_count' => $quiz->questions_count,
+            'section' => $quiz->section,
+            'user_has_attempted' => $attemptMeta->has($quiz->id),
+            'attempt_count' => (int) ($attemptMeta->get($quiz->id)?->attempt_count ?? 0),
+            'last_submitted_at' => $attemptMeta->get($quiz->id)?->last_submitted_at,
+        ]);
+
+        $bySection = fn (string $section) => $mapped->where('section', $section)->values();
 
         return response()->json([
-            'quiz1' => $mapSection('quiz1'),
-            'quiz2' => $mapSection('quiz2'),
-            'endterm' => $mapSection('endterm'),
+            'quiz1' => $bySection('quiz1'),
+            'quiz2' => $bySection('quiz2'),
+            'endterm' => $bySection('endterm'),
         ]);
     }
 }

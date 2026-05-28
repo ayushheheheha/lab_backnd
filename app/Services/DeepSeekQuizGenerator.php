@@ -45,6 +45,38 @@ Order the questions in the JSON in the SAME order they appear in the PDF: compre
 
 A comprehension question has NO "options", NO "correct_answer", NO "correct_answers", NO "marks" requirement (set marks: 0 or omit). It only carries the shared content in stem / stem_code / stem_table.
 
+CRITICAL RULE: DATASETS REFERENCED BY NAME — NEVER DROP A TABLE
+================================================================
+Some PDFs place a named dataset (e.g. "Scores Dataset", "Words Dataset - Complete", "Shopping Bills Dataset") in a separate section BEFORE, BETWEEN, or AFTER the questions that reference it. The dataset may not be visually adjacent to its question. Examples:
+  - A "Words Dataset - Complete" table sits between Q5 and Q6, but is referenced by Q5 ("the Words dataset") AND Q10 ("the Words dataset").
+  - A "Shopping Bills" dataset is referenced by Q4, Q7, Q8 but the actual table is not shown.
+
+Process every dataset/table you find in the PDF as follows:
+
+1. BEFORE writing any question, scan the ENTIRE PDF text and list every named dataset/table you can see (by its caption: "Scores Dataset", "Words Dataset - Complete", etc.).
+
+2. For each named dataset, identify EVERY question that references it by name (look for phrases like 'the "Words" dataset', 'the "Scores" dataset', 'using the X dataset', 'on the X dataset', 'refer to data from Question N', 'using the data above/below').
+
+3. If a named dataset is referenced by 2+ questions OR by any single question:
+   → Emit ONE "comprehension" question containing that dataset as stem_table (with caption matching the PDF caption like "Words Dataset - Complete"), placed immediately BEFORE the first question that references it (in PDF reading order).
+   → Each question that references the dataset should NOT re-embed it. Just emit the question text + its own procedure (if any) in stem_code.
+
+4. If a question has its OWN procedure/pseudocode that is unique to that question (different from the shared dataset), put that procedure in the question's own stem_code field — keep it tied to the question, do NOT promote it into the comprehension block.
+
+5. NEVER omit a table/dataset that exists in the PDF. If you see rows-and-columns data anywhere in the source, it MUST appear somewhere in your output — either inside a comprehension block (preferred when shared) or directly in the referencing question's stem_table (when only one question uses it).
+
+WORKED EXAMPLE — DATASET SHARED BY NON-ADJACENT QUESTIONS
+==========================================================
+PDF order: Q4 (Shopping Bills, no dataset shown) → Q5 (procedure, no dataset shown, references "Words dataset") → Words Dataset table → Q6 (Scores dataset) → ... → Q10 (references "Words dataset" again).
+
+Output order:
+  ... Q4 ...
+  comprehension { stem_table: { caption: "Words Dataset - Complete", headers: [...], rows: [[...]] } }   // emitted BEFORE Q5 because Q5 is the first to reference it
+  Q5 { type: mcq, stem: "...", stem_code: "Step 1: ..." }                                                 // procedure is Q5's own, goes in stem_code
+  Q6 ...
+  ...
+  Q10 { type: mcq, stem: "...", stem_code: "Step 1: ..." }                                                // re-uses the same Words dataset from above; do NOT duplicate stem_table
+
 QUESTION OBJECT SHAPE (per question)
 =====================================
 Common fields:
@@ -67,11 +99,58 @@ Type-specific fields (add to the common shape):
 - numerical:     "numerical_answer": <number>,  "numerical_tolerance": <number, default 0.01>
 - comprehension: (none — only the common content fields)
 
-OPTIONS CAN BE CODE
-====================
-If an option is itself code (e.g. "Which snippet is valid?"), write it as an object instead of a plain string:
-  { "option_type": "code", "option_text": "d = {'a': 1}", "code_language": "python" }
-Otherwise keep options as plain strings.
+CRITICAL RULE: OPTIONS THAT ARE CODE
+=====================================
+Whenever ANY option in an MCQ or multi_select question contains code, pseudocode, a code expression, a conditional/loop/return statement, or any programming construct — you MUST write that option as a JSON OBJECT, NOT a plain string:
+
+  { "option_type": "code", "option_text": "<exact code>", "code_language": "<pseudocode|python|java|cpp|sql|plaintext>" }
+
+This rule applies even when the option is a single short expression like "count = count + 1" or "return(True)".
+Plain string options are ONLY for natural-language text (e.g. "The algorithm terminates", "Both A and B").
+
+VIOLATION EXAMPLE (WRONG — never do this):
+  "options": [
+    "if(minAmount >= averageAmount){ return(True) } return(False)",
+    "if(Y.TotalBillAmount > minAmount){ return(True) } return(False)"
+  ]
+
+CORRECT:
+  "options": [
+    { "option_type": "code", "option_text": "if(minAmount >= averageAmount){ return(True) } return(False)", "code_language": "pseudocode" },
+    { "option_type": "code", "option_text": "if(Y.TotalBillAmount > minAmount){ return(True) } return(False)", "code_language": "pseudocode" }
+  ]
+
+WORKED EXAMPLE — MCQ WITH CODE OPTIONS (pseudocode fill-in-the-blank):
+{
+  "type": "mcq",
+  "stem": "Which of the following correctly fills in the blank marked by ******* in the procedure?",
+  "stem_code": "Procedure checkShoppingBills(Y)\ncount = 0, totalAmount = 0, minAmount = MAX_VALUE\nwhile(Pile 1 has more cards){\nRead the top card X from Pile 1\nif(X.ShopName == Y.ShopName){\ncount = count + 1\ntotalAmount = totalAmount + X.TotalBillAmount\nif(X.TotalBillAmount < minAmount){\nminAmount = X.TotalBillAmount\n}\n}\nMove card X to Pile 2\n}\naverageAmount = totalAmount / count\n*******\n** Fill the code **\n*******\nEnd checkShoppingBills",
+  "stem_code_language": "pseudocode",
+  "options": [
+    { "option_type": "code", "option_text": "if(minAmount >= averageAmount){ return(True) } return(False)", "code_language": "pseudocode" },
+    { "option_type": "code", "option_text": "if(Y.TotalBillAmount > minAmount){ return(True) } return(False)", "code_language": "pseudocode" },
+    { "option_type": "code", "option_text": "if(Y.TotalBillAmount >= minAmount){ return(True) } else{ return(False) }", "code_language": "pseudocode" },
+    { "option_type": "code", "option_text": "if(minAmount > averageAmount){ return(True) } return(False)", "code_language": "pseudocode" }
+  ],
+  "correct_answer": 3,
+  "marks": 2,
+  "difficulty": "medium"
+}
+
+WORKED EXAMPLE — MCQ WITH PYTHON CODE OPTIONS:
+{
+  "type": "mcq",
+  "stem": "Which Python snippet correctly creates a dictionary with key 'a' and value 1?",
+  "options": [
+    { "option_type": "code", "option_text": "d = {'a': 1}", "code_language": "python" },
+    { "option_type": "code", "option_text": "d = dict(a=1)", "code_language": "python" },
+    { "option_type": "code", "option_text": "d = ['a', 1]", "code_language": "python" },
+    { "option_type": "code", "option_text": "d = (a, 1)", "code_language": "python" }
+  ],
+  "correct_answer": 0,
+  "marks": 2,
+  "difficulty": "easy"
+}
 
 TABLES / DATASETS (stem_table)
 ==============================
@@ -89,6 +168,9 @@ Every row MUST be an array with the same number of cells as headers. Cells are s
 CODE / PSEUDOCODE / PROCEDURE BLOCKS (stem_code)
 =================================================
 Procedures, pseudocode listings, and program snippets MUST go into "stem_code" verbatim (keep the line breaks and the "Step 1:", "Step 2:" prefixes if present), with "stem_code_language": "pseudocode" (or "python" / "java" / "cpp" / "c" / "sql" if clearly identified). Do NOT paste the code into the "stem" field as a paragraph.
+
+Indentation in stem_code: preserve any indentation from the PDF. If the PDF has no indentation but the code has clear block structure (lines inside if/while/for/procedure bodies), add 2-space indentation per nesting level so the block structure is visually clear. Example:
+  while(Pile 1 has more cards){\n  Read the top card X from Pile 1\n  if(X.ShopName == Y.ShopName){\n    count = count + 1\n  }\n  Move card X to Pile 2\n}
 
 MATHEMATICAL NOTATION — MANDATORY
 ==================================
