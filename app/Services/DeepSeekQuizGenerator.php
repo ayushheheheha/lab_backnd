@@ -275,15 +275,30 @@ PROMPT;
             );
         }
 
+        $finishReason = $response->json('choices.0.finish_reason');
         $content = $response->json('choices.0.message.content');
+
         if (! is_string($content) || trim($content) === '') {
             throw new DeepSeekGenerationException('DeepSeek returned empty content.');
+        }
+
+        if ($finishReason === 'length') {
+            Log::warning('DeepSeek response truncated by max_tokens', [
+                'preview_tail' => mb_substr($content, -400),
+            ]);
+            throw new DeepSeekGenerationException(
+                'DeepSeek response was truncated (hit the output token limit). The PDF has too many large questions for a single request — try a smaller PDF, or split it into parts.'
+            );
         }
 
         $jsonString = $this->stripCodeFences($content);
         $decoded = json_decode($jsonString, true);
 
         if (! is_array($decoded)) {
+            Log::warning('DeepSeek returned unparseable content', [
+                'preview' => mb_substr($jsonString, 0, 500),
+                'json_error' => json_last_error_msg(),
+            ]);
             throw new DeepSeekGenerationException('DeepSeek response is not valid JSON.');
         }
 

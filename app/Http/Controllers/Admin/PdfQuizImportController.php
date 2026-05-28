@@ -22,6 +22,11 @@ class PdfQuizImportController extends Controller
         DeepSeekQuizGenerator $generator,
         QuestionImporter $importer
     ): JsonResponse {
+        // DeepSeek can take several minutes for large PDFs; override PHP's
+        // default max_execution_time (60s on most Laragon installs).
+        @set_time_limit(0);
+        @ini_set('max_execution_time', '0');
+
         $validated = $request->validate([
             'pdf' => ['required', 'file', 'mimetypes:application/pdf', 'mimes:pdf', 'max:10240'],
             'course_id' => ['required', 'integer', 'exists:courses,id'],
