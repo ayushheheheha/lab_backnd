@@ -138,10 +138,11 @@ class AuthController extends Controller
         $token = $user->createToken('auth_token')->plainTextToken;
 
         LoginLog::create([
-            'user_id'     => $user->id,
-            'ip_address'  => request()->ip(),
-            'user_agent'  => substr((string) request()->userAgent(), 0, 300),
-            'auth_method' => 'email',
+            'user_id'      => $user->id,
+            'ip_address'   => request()->ip(),
+            'user_agent'   => substr((string) request()->userAgent(), 0, 300),
+            'auth_method'  => 'email',
+            'logged_in_at' => now(),
         ]);
 
         return response()->json([
@@ -326,10 +327,11 @@ class AuthController extends Controller
             $token = $user->createToken('auth_token')->plainTextToken;
 
             LoginLog::create([
-                'user_id'     => $user->id,
-                'ip_address'  => request()->ip(),
-                'user_agent'  => substr((string) request()->userAgent(), 0, 300),
-                'auth_method' => 'google',
+                'user_id'      => $user->id,
+                'ip_address'   => request()->ip(),
+                'user_agent'   => substr((string) request()->userAgent(), 0, 300),
+                'auth_method'  => 'google',
+                'logged_in_at' => now(),
             ]);
 
             $encodedToken = urlencode($token);

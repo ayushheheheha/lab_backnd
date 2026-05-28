@@ -94,6 +94,10 @@ class AttemptController extends Controller
                     continue;
                 }
 
+                if ($question->type === 'comprehension') {
+                    continue;
+                }
+
                 $score = $this->autoScoreService->scoreAnswer($question, $answerData);
                 $sumAwarded += (float) $score['marks_awarded'];
 
@@ -192,6 +196,7 @@ class AttemptController extends Controller
                 'stem_image' => $question->stem_image,
                 'stem_code' => $question->stem_code,
                 'stem_code_language' => $question->stem_code_language,
+                'stem_table' => $question->stem_table,
                 'marks' => (float) $question->marks,
                 'marks_awarded' => (float) ($studentAnswer?->marks_awarded ?? 0),
                 'is_correct' => (bool) ($studentAnswer?->is_correct ?? false),

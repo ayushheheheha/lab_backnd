@@ -41,4 +41,10 @@ return [
         'url' => env('PISTON_API_URL', 'https://emkc.org/api/v2/piston'),
     ],
 
+    'deepseek' => [
+        'key' => env('DEEPSEEK_API_KEY'),
+        'endpoint' => env('DEEPSEEK_API_URL', 'https://api.deepseek.com/chat/completions'),
+        'model' => env('DEEPSEEK_MODEL', 'deepseek-chat'),
+    ],
+
 ];

@@ -19,12 +19,17 @@ class Question extends Model
         'stem_image',
         'stem_code',
         'stem_code_language',
+        'stem_table',
         'explanation',
         'marks',
         'difficulty',
         'position',
         'numerical_answer',
         'numerical_tolerance',
+    ];
+
+    protected $casts = [
+        'stem_table' => 'array',
     ];
 
     public function quiz(): BelongsTo

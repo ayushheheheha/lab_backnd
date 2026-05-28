@@ -43,6 +43,7 @@ class QuizController extends Controller
                 'stem_image' => $question->stem_image,
                 'stem_code' => $question->stem_code,
                 'stem_code_language' => $question->stem_code_language,
+                'stem_table' => $question->stem_table,
                 'marks' => (float) $question->marks,
                 'difficulty' => $question->difficulty,
                 'position' => $question->position,

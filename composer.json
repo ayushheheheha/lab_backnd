@@ -10,6 +10,7 @@
         "laravel/sanctum": "^4.3",
         "laravel/socialite": "^5.26",
         "laravel/tinker": "^2.9",
+        "smalot/pdfparser": "^2.12",
         "spatie/laravel-permission": "^6.25"
     },
     "require-dev": {

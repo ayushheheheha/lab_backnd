@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\AdminIDEController;
 use App\Http\Controllers\Admin\AdminQuestionController;
 use App\Http\Controllers\Admin\AdminQuizController;
 use App\Http\Controllers\Admin\AdminVideoSolutionController;
+use App\Http\Controllers\Admin\PdfQuizImportController;
 use App\Http\Controllers\AttemptController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CodePlaygroundController;
@@ -97,6 +98,7 @@ Route::middleware(['auth:sanctum', 'is_admin'])->prefix('admin')->group(function
     // Quiz management
     Route::get('/quizzes', [AdminQuizController::class, 'index']);
     Route::post('/quizzes', [AdminQuizController::class, 'store']);
+    Route::post('/quizzes/import-pdf', PdfQuizImportController::class)->middleware('throttle:3,1');
     Route::get('/quizzes/{id}', [AdminQuizController::class, 'show']);
     Route::put('/quizzes/{id}', [AdminQuizController::class, 'update']);
     Route::delete('/quizzes/{id}', [AdminQuizController::class, 'destroy']);
