@@ -11,6 +11,19 @@ class DeepSeekQuizGenerator
     private const SYSTEM_PROMPT = <<<'PROMPT'
 You convert the extracted text of a question-paper PDF into a strict JSON payload for bulk quiz import. The PDF already contains complete questions, options, code/pseudocode, tables/datasets, and (usually) an answer key. Your job is to FAITHFULLY restructure them into the JSON shape below — never invent, rewrite, paraphrase, "improve", summarize, or fix anything in the questions. Preserve the original wording exactly.
 
+HANDLING IMPERFECT EXTRACTION
+=============================
+The extracted text may contain artifacts from the PDF parser. Handle these without inventing content:
+- IGNORE page furniture: page numbers, headers, footers, running titles, watermarks, course codes printed in margins, "Page N of M", institutional logos.
+- MULTI-COLUMN PDFs may produce interleaved text. Use the question numbering (Q1, Q2, 1., 2., etc.) as the source of truth for grouping content; lines belong to the question they sit closest to in the text.
+- WRAPPED LINES: when an option, sentence, or table row continues on the next line, join it into one logical unit. Never split one option into two because of a line break.
+- TABLE EXTRACTION often produces space-separated rows. Reconstruct each row by detecting alignment: if you see "Bhuvanesh M 7 Nov Erode 68 64 78 210", treat that as one row of a multi-column table with header "Name Gender DateOfBirth CityTown Mathematics Physics Chemistry Total".
+- PSEUDOCODE/CODE LISTINGS often have line numbers in the left gutter ("1 count = 0", "2 while(...){"). STRIP all leading line numbers — the rendering system adds them automatically. Keep the actual code lines verbatim.
+- MATH: any equation, fraction, subscript, superscript, Greek letter, integral, or set operator MUST be converted to LaTeX wrapped in $...$ (inline) or $$...$$ (display). Never write math as plain text approximations like "1/2" or "n!/k!(n-k)!".
+- ANSWER KEYS printed on a later page (or at the end): match each answer entry to its question by question number, then fill the correct field in JSON.
+- If a question's text or options are illegible / partially missing, still emit the question with the best-effort transcription and note the uncertainty in "explanation": "[partially garbled in source]".
+- DO NOT skip questions. Every question present in the extracted text must appear in the output, in source order.
+
 OUTPUT FORMAT
 =============
 Return ONLY a single raw JSON object. No markdown, no backticks, no commentary, no leading/trailing prose. The top-level shape is exactly:
@@ -53,7 +66,7 @@ Some PDFs place a named dataset (e.g. "Scores Dataset", "Words Dataset - Complet
 
 Process every dataset/table you find in the PDF as follows:
 
-1. BEFORE writing any question, scan the ENTIRE PDF text and list every named dataset/table you can see (by its caption: "Scores Dataset", "Words Dataset - Complete", etc.).
+1. BEFORE writing any question, scan the ENTIRE PDF and list every named dataset/table you can see (by its caption: "Scores Dataset", "Words Dataset - Complete", etc.).
 
 2. For each named dataset, identify EVERY question that references it by name (look for phrases like 'the "Words" dataset', 'the "Scores" dataset', 'using the X dataset', 'on the X dataset', 'refer to data from Question N', 'using the data above/below').
 
@@ -176,19 +189,29 @@ IMPORTANT: Do NOT include line numbers in stem_code. The rendering system adds l
 
 CRITICAL RULE: NUMBERED PSEUDOCODE LINES — STRIP LINE NUMBERS
 ==============================================================
-Many PDFs print pseudocode with line numbers on the left side (e.g. "1 count = 0", "2 while(Table 1 has more rows){"). PDF text extraction sometimes separates the numbers from the actual code, delivering them as a block of bare numbers followed by the code text, or as prefixed lines. YOU MUST:
+Many PDFs print pseudocode with line numbers in the left gutter (e.g. "1 count = 0", "2 while(Table 1 has more rows){"). The rendering system on the student side adds line numbers automatically, so the line numbers in the PDF are PURELY VISUAL DECORATION. YOU MUST:
 
 1. STRIP all leading line-number prefixes from pseudocode lines before putting them in stem_code.
    WRONG stem_code: "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12"   ← bare numbers only — NEVER output this
    WRONG stem_code: "1 count = 0\n2 while(Table 1 has more rows){"   ← numbers still attached
    CORRECT stem_code: "count = 0\nwhile(Table 1 has more rows){"    ← clean code, no numbers
 
-2. If the extracted text for a code block is ONLY numbers (1, 2, 3 … N) with no code text on the same lines, the extraction failed. In that case look elsewhere in the PDF text for the actual code lines (they may appear later in the text stream). Reconstruct the pseudocode from the surrounding text as best you can. If truly unrecoverable, set stem_code: "" and add "(Pseudocode could not be extracted from PDF)" to the stem.
+2. NEVER store bare line numbers as the stem_code content. A stem_code of "1\n2\n3..." is always wrong.
 
-3. NEVER store bare line numbers as the stem_code content. A stem_code of "1\n2\n3..." is always wrong.
-
-WORKED EXAMPLE — numbered pseudocode in PDF text:
-PDF text extracted: "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\ncount = 0\nwhile(Table 1 has more rows){\n  Read the first row X in Table 1\n  foreach c in S{\n    if (X.SeqNo == c){\n      if(X.Mathematics < 75 and X.Physics < 75){\n        count = count + 1\n      }\n    }\n  }\n  Move X to Table 2\n}"
+WORKED EXAMPLE — numbered pseudocode in the PDF:
+The PDF shows (with gutter numbers on the left):
+  1  count = 0
+  2  while(Table 1 has more rows){
+  3    Read the first row X in Table 1
+  4    foreach c in S{
+  5      if (X.SeqNo == c){
+  6        if(X.Mathematics < 75 and X.Physics < 75){
+  7          count = count + 1
+  8        }
+  9      }
+  10   }
+  11   Move X to Table 2
+  12 }
 
 Correct stem_code output:
 "count = 0\nwhile(Table 1 has more rows){\n  Read the first row X in Table 1\n  foreach c in S{\n    if (X.SeqNo == c){\n      if(X.Mathematics < 75 and X.Physics < 75){\n        count = count + 1\n      }\n    }\n  }\n  Move X to Table 2\n}"
@@ -345,13 +368,13 @@ PROMPT;
 
         $trimmed = trim($pdfText);
         if ($trimmed === '') {
-            throw new DeepSeekGenerationException('PDF text is empty.');
+            throw new DeepSeekGenerationException('Extracted PDF text is empty.');
         }
 
         $lastError = null;
         for ($attempt = 1; $attempt <= 2; $attempt++) {
             try {
-                return $this->callApiAndValidate($trimmed, $apiKey);
+                return $this->callApiWithText($trimmed, $apiKey);
             } catch (DeepSeekGenerationException $e) {
                 $lastError = $e;
                 Log::warning('DeepSeek quiz generation attempt failed', [
@@ -364,20 +387,21 @@ PROMPT;
         throw $lastError ?? new DeepSeekGenerationException('DeepSeek generation failed after retry.');
     }
 
-    private function callApiAndValidate(string $pdfText, string $apiKey): array
+    private function callApiWithText(string $pdfText, string $apiKey): array
     {
         $endpoint = config('services.deepseek.endpoint', 'https://api.deepseek.com/chat/completions');
         $model = config('services.deepseek.model', 'deepseek-chat');
 
         $response = Http::withToken($apiKey)
             ->timeout(300)
+            ->connectTimeout(30)
             ->acceptJson()
             ->asJson()
             ->post($endpoint, [
                 'model' => $model,
                 'messages' => [
                     ['role' => 'system', 'content' => self::SYSTEM_PROMPT],
-                    ['role' => 'user', 'content' => "PDF CONTENT:\n\n".$pdfText],
+                    ['role' => 'user', 'content' => "EXTRACTED PDF TEXT:\n\n".$pdfText],
                 ],
                 'max_tokens' => 16000,
                 'temperature' => 0.2,
