@@ -38,7 +38,7 @@ class AdminDashboardController extends Controller
             ->values();
 
         $recentLogins = LoginLog::query()
-            ->with('user:id,name,email,is_admin')
+            ->with('user:id,name,email,is_admin,is_pro')
             ->orderByDesc('logged_in_at')
             ->limit(20)
             ->get()
@@ -48,6 +48,7 @@ class AdminDashboardController extends Controller
                 'name'        => $log->user?->name ?? '—',
                 'email'       => $log->user?->email ?? '—',
                 'is_admin'    => (bool) ($log->user?->is_admin ?? false),
+                'is_pro'      => (bool) ($log->user?->is_pro ?? false),
                 'ip_address'  => $log->ip_address,
                 'auth_method' => $log->auth_method,
                 'logged_in_at' => $log->logged_in_at,
@@ -81,6 +82,21 @@ class AdminDashboardController extends Controller
         return response()->json([
             'message' => "{$target->name} has been granted admin access.",
             'user_id' => $target->id,
+        ]);
+    }
+
+    public function togglePro(int $userId): JsonResponse
+    {
+        $target = User::findOrFail($userId);
+
+        $target->update(['is_pro' => ! $target->is_pro]);
+
+        return response()->json([
+            'message' => $target->is_pro
+                ? "{$target->name} is now a Pro member."
+                : "{$target->name}'s Pro access was removed.",
+            'user_id' => $target->id,
+            'is_pro'  => $target->is_pro,
         ]);
     }
 }

@@ -24,6 +24,7 @@ class User extends Authenticatable
         'google_id',
         'avatar',
         'is_admin',
+        'is_pro',
         'email_verified_at',
         'otp',
         'otp_expires_at',
@@ -52,6 +53,7 @@ class User extends Authenticatable
     {
         return [
             'is_admin' => 'boolean',
+            'is_pro' => 'boolean',
             'email_verified_at' => 'datetime',
             'otp_expires_at' => 'datetime',
             'last_xp_action_date' => 'date',

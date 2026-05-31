@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\AdminQuestionController;
 use App\Http\Controllers\Admin\AdminQuizController;
 use App\Http\Controllers\Admin\AdminVideoSolutionController;
 use App\Http\Controllers\Admin\JsonQuizImportController;
+use App\Http\Controllers\Admin\JsonVideoImportController;
 use App\Http\Controllers\Admin\PdfQuizImportController;
 use App\Http\Controllers\AttemptController;
 use App\Http\Controllers\AuthController;
@@ -30,6 +31,13 @@ Route::post('/auth/password/forgot', [AuthController::class, 'forgotPassword'])-
 Route::post('/auth/password/reset', [AuthController::class, 'resetPassword'])->middleware('throttle:5,10');
 Route::get('/auth/google', [AuthController::class, 'googleRedirect']);
 Route::get('/auth/google/callback', [AuthController::class, 'googleCallback'])->middleware('throttle:10,1');
+
+// Hardened video player page. Reached only via a short-lived signed URL issued by
+// the gated /video-solutions/{id}/play endpoint, and framed by the SPA.
+Route::get('/video-solutions/embed/{id}', [VideoSolutionController::class, 'embed'])
+    ->whereNumber('id')
+    ->middleware('signed')
+    ->name('video.embed');
 
 // Authenticated student routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -67,6 +75,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Video solutions
     Route::get('/video-solutions', [VideoSolutionController::class, 'index']);
+    Route::get('/video-solutions/{id}/play', [VideoSolutionController::class, 'play'])
+        ->whereNumber('id')
+        ->middleware('throttle:60,1');
 
     // Leaderboard
     Route::get('/leaderboard', [LeaderboardController::class, 'index']);
@@ -128,9 +139,11 @@ Route::middleware(['auth:sanctum', 'is_admin'])->prefix('admin')->group(function
     // Video solution management
     Route::get('/video-solutions', [AdminVideoSolutionController::class, 'index']);
     Route::post('/video-solutions', [AdminVideoSolutionController::class, 'store']);
+    Route::post('/video-solutions/import-json', JsonVideoImportController::class)->middleware('throttle:10,1');
     Route::put('/video-solutions/{id}', [AdminVideoSolutionController::class, 'update']);
     Route::delete('/video-solutions/{id}', [AdminVideoSolutionController::class, 'destroy']);
 
     // User management
     Route::post('/users/{userId}/grant-admin', [AdminDashboardController::class, 'grantAdmin']);
+    Route::patch('/users/{userId}/toggle-pro', [AdminDashboardController::class, 'togglePro']);
 });

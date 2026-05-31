@@ -101,7 +101,7 @@ Common fields:
   "stem_table": { "caption": "<optional>", "headers": [...], "rows": [[...], [...]] },   // optional
   "marks": <number, e.g. 1 or 2; use 0 for comprehension>,
   "difficulty": "easy" | "medium" | "hard",
-  "explanation": "<optional, only if PDF shows a worked solution / reasoning>"
+  "explanation": "<REQUIRED if the PDF shows a 'Solution', 'Explanation', 'Hint', or worked-out reasoning section for this question — see CRITICAL RULE below>"
 }
 
 Type-specific fields (add to the common shape):
@@ -164,6 +164,113 @@ WORKED EXAMPLE — MCQ WITH PYTHON CODE OPTIONS:
   "marks": 2,
   "difficulty": "easy"
 }
+
+CRITICAL RULE: STEM / EXPLANATION FORMATTING — LINE BREAKS AND BOLD
+====================================================================
+Every "stem", "explanation", and (where applicable) "option_text" field in your JSON output MUST use line breaks and bold emphasis to preserve readability. The rendering pipeline supports:
+
+LINE BREAKS:
+- Use literal "\n" inside the JSON string to force a SINGLE line break (visual break, no extra spacing).
+- Use "\n\n" to create a PARAGRAPH break (an empty line of separation).
+- Single spaces between sentences are collapsed by the renderer — they do NOT create breaks.
+
+When you MUST insert line breaks:
+- Numbered or lettered sub-items inside a stem ("1. ...", "2. ...", "3. ...", "(a) ...", "(b) ...") → each item on its own line.
+- Multiple labeled cases inside a stem ("Pair 1: ...", "Pair 2: ...", "Case A: ...", "Scenario 1: ...") → each label starts on a new line, preceded by "\n\n".
+- Display equations (`$$...$$`) → on their own line surrounded by "\n\n".
+- "Given:", "Find:", "Hint:", "Note:" sub-sentences → each on its own line.
+- In an explanation: every distinct reasoning step gets its own line; between a narrative sentence and an equation block use "\n\n".
+
+BOLD EMPHASIS (use Markdown **double-asterisk** syntax):
+- The rendering pipeline parses **bold** in stem, options, and explanation.
+- USE bold for the following — apply liberally so important elements stand out:
+  - Structural labels:           **Pair 1:**, **Pair 2:**, **Step 1:**, **Given:**, **Find:**, **Hint:**, **Note:**, **Solution:**, **Example:**
+  - Critical conditional words that affect the answer: **at least**, **at most**, **exactly**, **NOT**, **must**, **only**, **always**, **never**, **given that**, **if and only if**
+  - Key technical terms being introduced/asked about: **maximum likelihood estimate**, **reconstruction loss**, **expected value**, **variance**, **Markov's inequality**, **Chebyshev's inequality**, **likelihood function**
+  - Critical numerical values in prose (not already inside $...$): "flipped **200** times", "sample size **n = 8**"
+  - Final answer phrases inside an explanation: "**Therefore**, $\mu = \bar{x}$", "**Hence**, the upper bound is $\frac{1}{6}$"
+- DO NOT bold content that is already inside $...$ LaTeX delimiters — math is already visually distinct via KaTeX rendering.
+- For bold INSIDE a LaTeX equation, use `\mathbf{...}` or `\boldsymbol{...}` instead of `**...**`.
+
+WORKED EXAMPLE — STEM WITH LABELED CASES (Pair 1 / Pair 2):
+PDF shows:
+  Consider two encoder functions f and f̃ with decoders g and g̃ respectively aiming to reduce the dimensionality of the data set from 3 to 1: Pair 1: f(x1, x2, x3) = x1 − x2 + x3 and g(u) = [u, u, u] Pair 2: f̃(x1, x2, x3) = (x1+x2+x3)/3 and g̃(u) = [u, u, u] The reconstruction loss of the encoder decoder pair is the mean of the squared distance between the reconstructed input and input. What is the reconstruction loss for Pair 1? (Enter the answer correct to 2 decimal places)
+
+Correct stem (note \n\n line breaks and ** bold labels **):
+"stem": "Consider two encoder functions $f$ and $\\tilde{f}$ with decoders $g$ and $\\tilde{g}$ respectively, aiming to reduce the dimensionality of the data set from 3 to 1:\n\n**Pair 1:** $f(x_1, x_2, x_3) = x_1 - x_2 + x_3$ and $g(u) = [u, u, u]$\n\n**Pair 2:** $\\tilde{f}(x_1, x_2, x_3) = \\frac{x_1 + x_2 + x_3}{3}$ and $\\tilde{g}(u) = [u, u, u]$\n\nThe **reconstruction loss** of the encoder-decoder pair is the mean of the squared distance between the reconstructed input and the input.\n\nWhat is the reconstruction loss for **Pair 1**? (Enter the answer correct to 2 decimal places.)"
+
+WORKED EXAMPLE — STEM WITH NUMBERED SUB-ITEMS:
+PDF shows:
+  Which of the following is true about a model?
+  1. A model is a mathematical representation of reality.
+  2. A model is an exact representation of a system.
+  3. A model uses no assumptions.
+
+Correct stem:
+"stem": "Which of the following is true about a model?\n\n1. A model is a mathematical representation of reality.\n2. A model is an exact representation of a system.\n3. A model uses no assumptions."
+
+WORKED EXAMPLE — STEM WITH HINT AND BOLD KEYWORD:
+PDF shows:
+  Which of the following option is correct. (Hint: Use Chebyshev's inequality). Here µ and σ are the mean and standard deviation of random variable X.
+
+Correct stem:
+"stem": "Which of the following option is correct?\n\n**Hint:** Use **Chebyshev's inequality**.\n\nHere $\\mu$ and $\\sigma$ are the mean and standard deviation of random variable $X$."
+
+CRITICAL RULE: SOLUTION / EXPLANATION CAPTURE
+==============================================
+Most question PDFs print a worked solution under each question, usually with one of these prefixes: "Solution:", "Solution :", "Explanation:", "Hint:", "Working:", "Reasoning:". You MUST capture this content into the question's "explanation" field. Skipping it is a transcription failure.
+
+What to capture:
+- Everything from immediately after the "Solution:"/"Explanation:" label up to the next question number, the next section heading, or the answer key block — whichever comes first.
+- The "Answer: X" line itself goes into the type-specific answer field (correct_answer / numerical_answer / etc.), NOT into explanation.
+- If the PDF prints "Solution:" twice in a row by mistake ("Solution: Solution:"), strip the duplicate.
+
+How to format the explanation string:
+1. PRESERVE MULTI-LINE STRUCTURE. Solutions typically have several steps. Keep each step on its own line by using literal "\n" inside the JSON string. Use "\n\n" to separate paragraphs (e.g. between an intro and an equation block). Do NOT collapse a multi-step solution into one wall of text. The same line-break rules from "CRITICAL RULE: STEM / EXPLANATION FORMATTING" apply here.
+1a. USE BOLD for narrative emphasis: "**Solution:**" header on its own line at the start, "**Therefore**", "**Hence**", "**Step 1:**", "**Taking log on both sides**", and any key term or conclusion. Bold should mark the reasoning structure so a reader can skim the proof.
+2. WRAP ALL MATH IN LATEX. Every equation, fraction, summation, integral, expectation, variance, Greek letter, subscript, superscript, vector, matrix, set operator, or probability statement MUST be wrapped:
+   - Inline math: $...$  (e.g. $E(X) = np = 200 \cdot \frac{1}{10} = 20$)
+   - Display/block math (a centered equation on its own line): $$...$$  (e.g. $$P(X \geq 120) \leq \frac{E(X)}{120} = \frac{20}{120} = \frac{1}{6}$$)
+   - For multi-line equation derivations, use $$\begin{aligned} ... \\ ... \end{aligned}$$ with `\\` between rows.
+   - NEVER write math as plain text approximations (no "n!/k!(n-k)!", no "p = sum(xi)/mn"). Always use LaTeX commands like \frac, \sum, \int, \leq, \geq, \neq, \infty, \cdot, \cup, \cap, \mu, \sigma, \theta, \pi, \alpha, \beta, \partial, \bar{x}, ^c, _{i=1}^{n}.
+3. PRESERVE THE NARRATIVE. Keep connective text like "Taking log on both sides,", "By Markov's inequality,", "Putting the values of α, p and n", "From the definition of gaussian model." — these explain the reasoning steps. Do NOT delete them.
+4. NEVER paraphrase, summarize, abbreviate, or "clean up" the math. Copy each step verbatim, only converting visual math to LaTeX.
+5. If a solution references a matrix / vector / table from the question, render it in LaTeX as $\begin{pmatrix} ... \end{pmatrix}$ or $\begin{bmatrix} ... \end{bmatrix}$.
+6. If the PDF solution mentions "Answer: A" or similar inside the worked text, you may include it in the explanation as the closing line, but the structured answer field (correct_answer) is still the source of truth.
+7. If there is GENUINELY no solution printed for a question, omit the "explanation" field entirely (do NOT set it to "" or "N/A" or "No solution provided").
+
+WORKED EXAMPLE — MCQ WITH MULTI-STEP LATEX EXPLANATION:
+PDF shows:
+  1. A biased coin, which lands heads with probability 1/10 each time it is flipped, is flipped 200 times consecutively. Give an upper bound on the probability that it lands heads at least 120 times using Markov's inequality.
+     A. 1/6   B. 2/6   C. 3/6   D. 4/6
+     Answer: A
+     Solution:
+     The number of heads is a binomially distributed random variable X, with parameter p = 1/10 and n = 200.
+     Thus, the expected number of heads is E(X) = np = 200 · 1/10 = 20
+     By Markov Inequality, the probability of at least 120 heads is P(X ≥ 120) ≤ E(X)/120 = 20/120 = 1/6
+
+Correct JSON output:
+{
+  "type": "mcq",
+  "stem": "A biased coin, which lands heads with probability $\\frac{1}{10}$ each time it is flipped, is flipped 200 times consecutively. Give an upper bound on the probability that it lands heads at least 120 times using Markov's inequality.",
+  "options": ["$\\frac{1}{6}$", "$\\frac{2}{6}$", "$\\frac{3}{6}$", "$\\frac{4}{6}$"],
+  "correct_answer": 0,
+  "marks": 1,
+  "difficulty": "medium",
+  "explanation": "The number of heads is a binomially distributed random variable $X$, with parameter $p = \\frac{1}{10}$ and $n = 200$.\n\nThus, the expected number of heads is $E(X) = np = 200 \\cdot \\frac{1}{10} = 20$.\n\nBy Markov's Inequality, the probability of at least 120 heads is:\n$$P(X \\geq 120) \\leq \\frac{E(X)}{120} = \\frac{20}{120} = \\frac{1}{6}$$"
+}
+
+WORKED EXAMPLE — MLE DERIVATION (multi-line derivation with \begin{aligned}):
+PDF shows:
+  Solution:
+  L = ∏ (1/(σ√2π)) exp(−(xi−µ)²/2σ²) = (1/(σ√2π))ⁿ exp(−Σ(xi−µ)²/2σ²)
+  Taking log on both sides,
+  log L = −(n/2)log(2π) − (n/2)log(σ²) − (1/2σ²) Σ(xi−µ)²
+  When σ² is known, the likelihood equation for estimating µ is ∂logL/∂µ = 0
+  Taking partial differentiation and solving we will get, µ = x̄.
+
+Correct explanation string (note the line breaks and LaTeX):
+"explanation": "$$L = \\prod_{i=1}^{n} \\frac{1}{\\sigma \\sqrt{2\\pi}} \\exp\\left(-\\frac{(x_i - \\mu)^2}{2\\sigma^2}\\right) = \\left(\\frac{1}{\\sigma \\sqrt{2\\pi}}\\right)^n \\exp\\left(-\\sum_{i=1}^{n} \\frac{(x_i - \\mu)^2}{2\\sigma^2}\\right)$$\n\nTaking log on both sides,\n\n$$\\log L = -\\frac{n}{2}\\log(2\\pi) - \\frac{n}{2}\\log(\\sigma^2) - \\frac{1}{2\\sigma^2}\\sum_{i=1}^{n}(x_i - \\mu)^2$$\n\nWhen $\\sigma^2$ is known, the likelihood equation for estimating $\\mu$ is:\n\n$$\\frac{\\partial \\log L}{\\partial \\mu} = 0$$\n\nTaking partial differentiation and solving we will get, $\\mu = \\bar{x}$."
 
 TABLES / DATASETS (stem_table)
 ==============================
@@ -357,6 +464,9 @@ FINAL CHECKS BEFORE RETURNING
 - Answers from the answer key are filled in the correct field for the question type.
 - Question order matches the PDF order.
 - Options are verbatim from the PDF — count, wording, and direction (less/more/equal) are preserved exactly.
+- Every question that has a "Solution:" / "Explanation:" / "Hint:" block in the PDF has a populated "explanation" field with multi-line structure preserved (\n / \n\n) and all math wrapped in LaTeX ($...$ inline, $$...$$ display). No collapsed-into-one-line explanations.
+- Stems with numbered sub-items, labeled cases (Pair 1 / Pair 2 / Case A), "Hint:", "Given:", "Note:", or display equations use "\n" / "\n\n" so the structure is visible — not run together as a single wall of text.
+- Bold (**...**) is applied to structural labels (Pair 1:, Step 1:, Hint:, Given:, Solution:, Therefore, Hence), critical conditional words (at least, exactly, NOT, must, only), and key technical terms being introduced. Math already inside $...$ is NOT additionally bolded with **.
 PROMPT;
 
     public function generateFromText(string $pdfText): array
