@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\AdminIDEController;
 use App\Http\Controllers\Admin\AdminQuestionController;
 use App\Http\Controllers\Admin\AdminQuizController;
 use App\Http\Controllers\Admin\AdminVideoSolutionController;
+use App\Http\Controllers\Admin\BulkJsonQuizImportController;
 use App\Http\Controllers\Admin\JsonQuizImportController;
 use App\Http\Controllers\Admin\JsonVideoImportController;
 use App\Http\Controllers\Admin\PdfQuizImportController;
@@ -112,6 +113,7 @@ Route::middleware(['auth:sanctum', 'is_admin'])->prefix('admin')->group(function
     Route::post('/quizzes', [AdminQuizController::class, 'store']);
     Route::post('/quizzes/import-pdf', PdfQuizImportController::class)->middleware('throttle:3,1');
     Route::post('/quizzes/import-json', JsonQuizImportController::class)->middleware('throttle:10,1');
+    Route::post('/quizzes/import-json-bulk', BulkJsonQuizImportController::class)->middleware('throttle:10,1');
     Route::get('/quizzes/{id}', [AdminQuizController::class, 'show']);
     Route::put('/quizzes/{id}', [AdminQuizController::class, 'update']);
     Route::delete('/quizzes/{id}', [AdminQuizController::class, 'destroy']);
