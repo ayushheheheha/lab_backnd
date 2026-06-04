@@ -130,6 +130,82 @@ class CourseController extends Controller
         ]);
     }
 
+    /**
+     * Returns the course plus every weekly practice/graded quiz in a single
+     * response. Collapsing the previous per-week request fan-out into one call
+     * avoids opening a burst of simultaneous DB connections (which the shared
+     * host rejects with SQLSTATE[HY000] [2002] once the connection cap is hit).
+     */
+    public function practice(Request $request, string $slug): JsonResponse
+    {
+        $user = $request->user();
+
+        $course = Course::query()
+            ->where('slug', $slug)
+            ->where('is_active', true)
+            ->withCount('ideProblems')
+            ->firstOrFail();
+
+        $weeks = $course->weeks()
+            ->where('is_active', true)
+            ->orderBy('week_number')
+            ->get(['id', 'week_number', 'title'])
+            ->keyBy('id');
+
+        $quizzes = $course->quizzes()
+            ->whereIn('week_id', $weeks->keys())
+            ->whereIn('section', Quiz::WEEKLY_SECTIONS)
+            ->where('is_active', true)
+            ->withCount('questions')
+            ->orderBy('week_id')
+            ->orderBy('id')
+            ->get([
+                'id',
+                'title',
+                'description',
+                'time_limit_minutes',
+                'section',
+                'week_id',
+            ]);
+
+        $attemptMeta = Attempt::query()
+            ->where('user_id', $user->id)
+            ->whereIn('quiz_id', $quizzes->pluck('id'))
+            ->where('is_complete', true)
+            ->whereNotNull('submitted_at')
+            ->selectRaw('quiz_id, MAX(submitted_at) as last_submitted_at, COUNT(*) as attempt_count')
+            ->groupBy('quiz_id')
+            ->get()
+            ->keyBy('quiz_id');
+
+        $mapped = $quizzes->map(fn ($quiz) => [
+            'id' => $quiz->id,
+            'title' => $quiz->title,
+            'description' => $quiz->description,
+            'time_limit_minutes' => $quiz->time_limit_minutes,
+            'question_count' => $quiz->questions_count,
+            'section' => $quiz->section,
+            'week_number' => $weeks->get($quiz->week_id)?->week_number,
+            'user_has_attempted' => $attemptMeta->has($quiz->id),
+            'attempt_count' => (int) ($attemptMeta->get($quiz->id)?->attempt_count ?? 0),
+            'last_submitted_at' => $attemptMeta->get($quiz->id)?->last_submitted_at,
+        ]);
+
+        return response()->json([
+            'course' => [
+                'id' => $course->id,
+                'name' => $course->name,
+                'slug' => $course->slug,
+                'description' => $course->description,
+                'icon' => $course->icon,
+                'has_ide' => (bool) $course->has_ide,
+                'has_ide_problems' => $course->ide_problems_count > 0,
+            ],
+            'practice' => $mapped->where('section', 'practice')->values(),
+            'graded' => $mapped->where('section', 'practice_graded')->values(),
+        ]);
+    }
+
     public function examPrep(Request $request, string $slug): JsonResponse
     {
         $user = $request->user();

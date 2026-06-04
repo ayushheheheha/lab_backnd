@@ -50,6 +50,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/courses', [CourseController::class, 'index']);
     Route::get('/courses/{slug}', [CourseController::class, 'show']);
     Route::get('/courses/{slug}/weeks', [CourseController::class, 'weeks']);
+    Route::get('/courses/{slug}/practice', [CourseController::class, 'practice']);
     Route::get('/courses/{slug}/weeks/{weekNumber}/quizzes', [CourseController::class, 'weekQuizzes']);
     Route::get('/courses/{slug}/exam-prep', [CourseController::class, 'examPrep']);
     Route::get('/courses/{slug}/ide-problems', [IDEController::class, 'bySlug']);
