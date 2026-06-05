@@ -41,7 +41,7 @@ Route::get('/video-solutions/embed/{id}', [VideoSolutionController::class, 'embe
     ->name('video.embed');
 
 // Authenticated student routes
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'track.seen'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/password/change', [AuthController::class, 'changePassword'])->middleware('throttle:5,10');
@@ -100,14 +100,16 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // Admin routes
-Route::middleware(['auth:sanctum', 'is_admin'])->prefix('admin')->group(function () {
+Route::middleware(['auth:sanctum', 'is_admin', 'track.seen'])->prefix('admin')->group(function () {
     Route::get('/stats', [AdminDashboardController::class, 'stats']);
+    Route::get('/analytics', [AdminDashboardController::class, 'analytics']);
 
     // Course management
     Route::get('/courses', [AdminCourseController::class, 'index']);
     Route::post('/courses', [AdminCourseController::class, 'store']);
     Route::put('/courses/{id}', [AdminCourseController::class, 'update']);
     Route::patch('/courses/{id}/toggle', [AdminCourseController::class, 'toggle']);
+    Route::delete('/courses/{id}', [AdminCourseController::class, 'destroy']);
 
     // Quiz management
     Route::get('/quizzes', [AdminQuizController::class, 'index']);

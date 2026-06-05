@@ -20,6 +20,7 @@ class CourseController extends Controller
                 'id',
                 'name',
                 'slug',
+                'level',
                 'description',
                 'icon',
                 'has_ide',
@@ -219,6 +220,7 @@ class CourseController extends Controller
             ->whereIn('section', ['quiz1', 'quiz2', 'endterm', 'mock_test'])
             ->where('is_active', true)
             ->withCount('questions')
+            ->orderByDesc('year')
             ->orderBy('id')
             ->get([
                 'id',
@@ -226,6 +228,7 @@ class CourseController extends Controller
                 'description',
                 'time_limit_minutes',
                 'section',
+                'year',
             ]);
 
         $attemptMeta = Attempt::query()
@@ -245,6 +248,7 @@ class CourseController extends Controller
             'time_limit_minutes' => $quiz->time_limit_minutes,
             'question_count' => $quiz->questions_count,
             'section' => $quiz->section,
+            'year' => $quiz->year,
             'user_has_attempted' => $attemptMeta->has($quiz->id),
             'attempt_count' => (int) ($attemptMeta->get($quiz->id)?->attempt_count ?? 0),
             'last_submitted_at' => $attemptMeta->get($quiz->id)?->last_submitted_at,

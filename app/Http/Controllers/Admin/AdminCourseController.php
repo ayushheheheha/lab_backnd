@@ -19,6 +19,7 @@ class AdminCourseController extends Controller
                 'id',
                 'name',
                 'slug',
+                'level',
                 'description',
                 'icon',
                 'has_ide',
@@ -34,6 +35,7 @@ class AdminCourseController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'slug' => ['nullable', 'string', 'max:120', 'unique:courses,slug'],
+            'level' => ['nullable', 'string', 'in:foundation,diploma,degree'],
             'description' => ['nullable', 'string'],
             'icon' => ['nullable', 'string', 'max:20'],
             'has_ide' => ['sometimes', 'boolean'],
@@ -54,6 +56,7 @@ class AdminCourseController extends Controller
             $course = Course::query()->create([
                 'name' => $validated['name'],
                 'slug' => $slug,
+                'level' => $validated['level'] ?? 'foundation',
                 'description' => $validated['description'] ?? null,
                 'icon' => $validated['icon'] ?? '📚',
                 'has_ide' => (bool) ($validated['has_ide'] ?? false),
@@ -98,6 +101,7 @@ class AdminCourseController extends Controller
 
         $validated = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:120'],
+            'level' => ['sometimes', 'string', 'in:foundation,diploma,degree'],
             'description' => ['nullable', 'string'],
             'icon' => ['nullable', 'string', 'max:20'],
             'has_ide' => ['sometimes', 'boolean'],
@@ -108,6 +112,20 @@ class AdminCourseController extends Controller
         $course->update($validated);
 
         return response()->json($course->fresh());
+    }
+
+    public function destroy(int $id): JsonResponse
+    {
+        $course = Course::query()->findOrFail($id);
+        $name = $course->name;
+
+        // Weeks and quizzes cascade via foreign keys; questions/attempts cascade
+        // off their quizzes. Wrapped so a partial delete never leaves orphans.
+        DB::transaction(fn () => $course->delete());
+
+        return response()->json([
+            'message' => "“{$name}” and all its content were deleted.",
+        ]);
     }
 
     public function toggle(int $id): JsonResponse

@@ -18,6 +18,7 @@ class Quiz extends Model
         'course_id',
         'week_id',
         'section',
+        'year',
         'title',
         'description',
         'time_limit_minutes',

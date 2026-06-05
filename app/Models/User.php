@@ -31,6 +31,7 @@ class User extends Authenticatable
         'xp',
         'last_xp_action_date',
         'highest_level_reached',
+        'last_seen_at',
     ];
 
     /**
@@ -57,6 +58,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'otp_expires_at' => 'datetime',
             'last_xp_action_date' => 'date',
+            'last_seen_at' => 'datetime',
             'xp' => 'integer',
             'highest_level_reached' => 'integer',
             'password' => 'hashed',

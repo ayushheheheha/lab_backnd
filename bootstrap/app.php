@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
             'is_admin' => \App\Http\Middleware\IsAdmin::class,
+            'track.seen' => \App\Http\Middleware\TrackLastSeen::class,
         ]);
 
         $middleware->redirectGuestsTo(fn (Request $request) => null);

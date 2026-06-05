@@ -29,6 +29,7 @@ class AdminQuizController extends Controller
                 'title' => $quiz->title,
                 'description' => $quiz->description,
                 'section' => $quiz->section,
+                'year' => $quiz->year,
                 'course_id' => $quiz->course_id,
                 'course_name' => $quiz->course?->name,
                 'week_id' => $quiz->week_id,
@@ -48,6 +49,7 @@ class AdminQuizController extends Controller
         $validated = $request->validate([
             'course_id' => ['required', 'exists:courses,id'],
             'section' => ['required', Rule::in(Quiz::SECTIONS)],
+            'year' => ['nullable', 'integer', 'min:1990', 'max:2100'],
             'week_id' => ['nullable', 'exists:weeks,id', Rule::requiredIf(fn () => in_array($request->input('section'), Quiz::WEEKLY_SECTIONS, true))],
             'title' => ['required', 'string', 'max:200'],
             'description' => ['nullable', 'string'],
@@ -57,6 +59,11 @@ class AdminQuizController extends Controller
 
         if (! in_array($validated['section'] ?? null, Quiz::WEEKLY_SECTIONS, true)) {
             $validated['week_id'] = null;
+        }
+
+        // Auto-fill the paper year from the title when the admin left it blank.
+        if (empty($validated['year'])) {
+            $validated['year'] = $this->parseYearFromTitle($validated['title']);
         }
 
         $quiz = Quiz::query()->create([
@@ -93,6 +100,7 @@ class AdminQuizController extends Controller
         $validated = $request->validate([
             'course_id' => ['sometimes', 'required', 'exists:courses,id'],
             'section' => ['sometimes', 'required', Rule::in(Quiz::SECTIONS)],
+            'year' => ['nullable', 'integer', 'min:1990', 'max:2100'],
             'week_id' => ['nullable', 'exists:weeks,id'],
             'title' => ['sometimes', 'required', 'string', 'max:200'],
             'description' => ['nullable', 'string'],
@@ -143,5 +151,21 @@ class AdminQuizController extends Controller
         ]);
 
         return response()->json($quiz->fresh());
+    }
+
+    /**
+     * Pull a 4-digit year (1990–2099) out of a quiz title, e.g. "Endterm 2023".
+     */
+    private function parseYearFromTitle(?string $title): ?int
+    {
+        if (! $title) {
+            return null;
+        }
+
+        if (preg_match('/\b(19|20)\d{2}\b/', $title, $matches)) {
+            return (int) $matches[0];
+        }
+
+        return null;
     }
 }
